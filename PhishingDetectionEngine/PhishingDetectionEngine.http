@@ -1,0 +1,6 @@
+@PhishingDetectionEngine_HostAddress = http://localhost:5031
+
+GET {{PhishingDetectionEngine_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
