@@ -1,9 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36518.9 d17.14
+VisualStudioVersion = 17.14.36518.9
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PhishingDetectionEngine", "PhishingDetectionEngine\PhishingDetectionEngine.csproj", "{0DECDF91-870F-4986-A28B-C65E562C82E0}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PhishingDetectionEngine.API", "PhishingDetectionEngine\PhishingDetectionEngine.API.csproj", "{0DECDF91-870F-4986-A28B-C65E562C82E0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PhishingDetectionEngine.Core", "PhishingDetectionEngine.Core\PhishingDetectionEngine.Core.csproj", "{445577E4-FBD9-466C-934E-8EDBBABEE235}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{0DECDF91-870F-4986-A28B-C65E562C82E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0DECDF91-870F-4986-A28B-C65E562C82E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0DECDF91-870F-4986-A28B-C65E562C82E0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{445577E4-FBD9-466C-934E-8EDBBABEE235}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{445577E4-FBD9-466C-934E-8EDBBABEE235}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{445577E4-FBD9-466C-934E-8EDBBABEE235}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{445577E4-FBD9-466C-934E-8EDBBABEE235}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
