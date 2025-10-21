@@ -12,7 +12,7 @@ namespace PhishingDetectionEngine.Core.Services
 {
     public class EmailParser : IEmailParser
     {
-        public async Task<ParsedEmail> ParseAsync(string fileName, Stream contentStream, CancellationToken cancellationToken = default)
+        public async Task<ParsedEmail> ParseAsync(string fileName, Stream contentStream)
         {
             if (string.IsNullOrWhiteSpace(fileName))
                 throw new ArgumentException("fileName is required", nameof(fileName));
@@ -21,7 +21,7 @@ namespace PhishingDetectionEngine.Core.Services
 
             if (extension == ".eml")
             {
-                return await ParseEmlAsync(contentStream, cancellationToken);
+                return await ParseEmlAsync(contentStream);
             }
             else if (extension == ".msg")
             {
@@ -33,9 +33,9 @@ namespace PhishingDetectionEngine.Core.Services
             }
         }
 
-        private async Task<ParsedEmail> ParseEmlAsync(Stream stream, CancellationToken ct)
+        private async Task<ParsedEmail> ParseEmlAsync(Stream stream)
         {
-            var message = await MimeMessage.LoadAsync(stream, ct);
+            var message = await MimeMessage.LoadAsync(stream);
 
             var model = new ParsedEmail
             {
@@ -58,7 +58,7 @@ namespace PhishingDetectionEngine.Core.Services
                 if (mp.Content != null)
                 {
                     await using var ms = new MemoryStream();
-                    await mp.Content.DecodeToAsync(ms, ct);
+                    await mp.Content.DecodeToAsync(ms);
                     size = ms.Length;
                 }
 

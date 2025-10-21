@@ -11,8 +11,7 @@ namespace PhishingDetectionEngine.Core.Interfaces
     {
         Task<ParsedEmail> ParseAsync(
             string fileName,
-            Stream contentStream,
-            CancellationToken cancellationToken = default);
+            Stream contentStream);
 
     }
 }
