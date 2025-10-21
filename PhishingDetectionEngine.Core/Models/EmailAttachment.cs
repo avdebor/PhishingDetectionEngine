@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,5 +13,4 @@ namespace PhishingDetectionEngine.Core.Models
         public long Size { get; set; }             
         public byte[] Content { get; set; }       
     }
-}
 }
