@@ -4,7 +4,7 @@ namespace PhishingDetectionEngine.Core.Interaces
 {
     public interface IPhishtankApiService
     {
-        Task PerformLookup(ParsedEmail email);
+        Task<DetectionResult> PerformLookup(ParsedEmail email);
     }
 }
 
