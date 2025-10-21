@@ -1,6 +1,10 @@
 using Microsoft.OpenApi.Models;
+using PhishingDetectionEngine.Core.Interfaces;
+using PhishingDetectionEngine.Core.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddScoped<IEmailParserService, EmailParserService>();
 
 // Add services to the container.
 builder.Services.AddControllers();
