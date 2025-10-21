@@ -7,11 +7,10 @@ using System.Threading.Tasks;
 
 namespace PhishingDetectionEngine.Core.Interfaces
 {
-    public interface IEmailParser
+    public interface IEmailParserService
     {
         Task<ParsedEmail> ParseAsync(
             string fileName,
             Stream contentStream);
-
     }
 }

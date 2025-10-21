@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace PhishingDetectionEngine.Core.Services
 {
-    public class EmailParser : IEmailParser
+    public class EmailParserService : IEmailParserService
     {
         public async Task<ParsedEmail> ParseAsync(string fileName, Stream contentStream)
         {
