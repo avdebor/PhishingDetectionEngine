@@ -1,7 +1,7 @@
 ﻿using MimeKit;
 using MsgReader.Outlook;
+using PhishingDetectionEngine.Core.Interfaces;
 using PhishingDetectionEngine.Core.Models;
-using PhishingDetectionEngine.Core.Services.IServices;
 using System;
 using System.Collections.Generic;
 using System.Linq;

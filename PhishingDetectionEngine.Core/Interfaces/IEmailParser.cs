@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PhishingDetectionEngine.Core.Services.IServices
+namespace PhishingDetectionEngine.Core.Interfaces
 {
     public interface IEmailParser
     {
