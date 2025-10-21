@@ -1,9 +1,14 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>net9.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<PublishTrimmed>false</PublishTrimmed>
+	</PropertyGroup>
 
-  <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
-
+	<ItemGroup>
+		<PackageReference Include="MimeKit" Version="4.14.0" />
+		<PackageReference Include="MsgReader" Version="6.0.5" />
+		<PackageReference Include="OpenMcdf" Version="3.0.3" />
+	</ItemGroup>
 </Project>
