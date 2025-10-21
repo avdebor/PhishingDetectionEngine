@@ -2,11 +2,8 @@
 using MsgReader.Outlook;
 using PhishingDetectionEngine.Core.Interfaces;
 using PhishingDetectionEngine.Core.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Diagnostics;
+
 
 namespace PhishingDetectionEngine.Core.Services
 {
@@ -75,8 +72,60 @@ namespace PhishingDetectionEngine.Core.Services
 
         private ParsedEmail ParseMsg(Stream stream)
         {
-            return new ParsedEmail { };
+            using var ms = new MemoryStream();
+            stream.CopyTo(ms);
+            ms.Position = 0;
+            Debug.WriteLine("HERE1: ");
+            using var msg = new Storage.Message(ms);
+            Debug.WriteLine("HERE2: ");
+
+            var model = new ParsedEmail
+            {
+                Subject = msg.Subject ?? string.Empty,
+                From = msg.Sender?.Email ?? msg.Sender?.DisplayName ?? string.Empty,
+                To = string.Join(", ",
+                            (msg.Recipients ?? Enumerable.Empty<Storage.Recipient>())
+                            .Select(r => r.Email ?? r.DisplayName)
+                            .Where(s => !string.IsNullOrWhiteSpace(s))),
+                TextBody = msg.BodyText ?? string.Empty,
+                HtmlBody = msg.BodyHtml ?? string.Empty,
+            };
+            Debug.WriteLine("HERE3: " + msg.Subject);
+            
+            model.Headers["MessageId"] = msg.Id ?? string.Empty;
+            if (msg.SentOn.HasValue)
+                model.Headers["SentOn"] = msg.SentOn.Value.ToString("o");
+
+            var attachments = (msg.Attachments ?? new System.Collections.Generic.List<object>())
+                .OfType<Storage.Attachment>();
+
+            foreach (var att in attachments)
+            {
+                var fileName = att.FileName ?? "attachment";
+                var size = att.Data?.LongLength ?? 0;
+
+                string contentType;
+                try
+                {
+                    contentType = MimeTypes.GetMimeType(fileName);
+                }
+                catch
+                {
+                    contentType = "application/octet-stream";
+                }
+
+                model.Attachments.Add(new EmailAttachment
+                {
+                    FileName = fileName,
+                    ContentType = contentType,
+                    Size = (long)size
+                });
+            }
+
+            return model;
         }
+
+
     }
 
 

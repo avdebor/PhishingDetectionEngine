@@ -1,8 +1,10 @@
 using Microsoft.OpenApi.Models;
 using PhishingDetectionEngine.Core.Interfaces;
 using PhishingDetectionEngine.Core.Services;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
 builder.Services.AddScoped<IEmailParserService, EmailParserService>();
 
