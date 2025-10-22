@@ -53,7 +53,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 }
                 else 
                 {
-                    int phishingCount = 0;
+                    bool phishingFound = false;
 
                     foreach (var url in urlsToCheck)
                     {
@@ -63,14 +63,16 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                         if (isPhishing)
                         {
                             detectionResult.Flags.Add($"Phishing URL detected: {url}");
-                            phishingCount++;
+                            phishingFound = true;
                         }
                     }
-                    // Calculate percentage
-                    detectionResult.Percentage = urlsToCheck.Count > 0 ?
-                        (phishingCount * 100) / urlsToCheck.Count : 0;
 
-                    detectionResult.Flags.Add($"Scanned {urlsToCheck.Count} URLs, found {phishingCount} phishing");
+                    detectionResult.Flags.Add($"Scanned {urlsToCheck.Count} URLs");
+
+                    if (phishingFound)
+                    {
+                        detectionResult.Percentage = 100;
+                    }
                 }
             }
             catch (Exception ex)
