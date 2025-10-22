@@ -15,7 +15,7 @@ namespace PhishingDetectionEngine.Controllers
         private readonly IEmailParserService _emailParserService;
         //private readonly IPhishtankApiService IPhishtankApiService;
 
-        public EmailUploadController(IEmailParserService emailParserService, IPhishtankApiService phishtankApiService)
+        public EmailUploadController(IEmailParserService emailParserService) //, IPhishtankApiService phishtankApiService)
         {
             _emailParserService = emailParserService ?? throw new ArgumentNullException(nameof(emailParserService));
             //IPhishtankApiService = phishtankApiService ?? throw new ArgumentNullException(nameof(phishtankApiService));
