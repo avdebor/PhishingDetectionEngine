@@ -46,33 +46,32 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                     .Distinct()
                     .ToList();
 
-                if (urlsToCheck.Count == 0)
+                if (!urlsToCheck.Any())
                 {
-                    //return empty result if no URLs found
+                    // Return empty result if no URLs found
                     return detectionResult;
                 }
-                else 
+                else
                 {
-                    bool phishingFound = false;
-
-                    foreach (var url in urlsToCheck)
+                    // Check all URLs asynchronously
+                    var phishingResults = await Task.WhenAll(urlsToCheck.Select(async url => new
                     {
-                        // Make direct API call and parse JSON manually
-                        var isPhishing = await CheckUrlWithPhishTank(url);
+                        Url = url,
+                        IsPhishing = await CheckUrlWithPhishTank(url)
+                    }));
 
-                        if (isPhishing)
-                        {
-                            detectionResult.Flags.Add($"Phishing URL detected: {url}");
-                            phishingFound = true;
-                        }
-                    }
+                    // Collect phishing URLs
+                    var phishingUrls = phishingResults
+                        .Where(r => r.IsPhishing)
+                        .Select(r => r.Url)
+                        .ToList();
 
+                    // Add detection flags
+                    phishingUrls.ForEach(url => detectionResult.Flags.Add($"Phishing URL detected: {url}"));
                     detectionResult.Flags.Add($"Scanned {urlsToCheck.Count} URLs");
 
-                    if (phishingFound)
-                    {
-                        detectionResult.Percentage = 100;
-                    }
+                    // Set percentage (100% if any phishing found)
+                    detectionResult.Percentage = phishingUrls.Any() ? 100 : 0;
                 }
             }
             catch (Exception ex)
