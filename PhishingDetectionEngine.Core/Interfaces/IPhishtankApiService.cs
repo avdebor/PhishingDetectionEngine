@@ -1,10 +1,10 @@
 using PhishingDetectionEngine.Core.Models;
 
-namespace PhishingDetectionEngine.Core.Interaces
+namespace PhishingDetectionEngine.Core.Interfaces
 {
     public interface IPhishtankApiService
     {
-        Task PerformLookup(ParsedEmail email);
+        Task<DetectionResult> PerformLookup(ParsedEmail email);
     }
 }
 
