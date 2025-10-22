@@ -1,5 +1,4 @@
 using Microsoft.OpenApi.Models;
-using PhishingDetectionEngine.Core.Interaces;
 using PhishingDetectionEngine.Core.Interfaces;
 using PhishingDetectionEngine.Core.ServiceModules;
 using PhishingDetectionEngine.Core.Services;
@@ -22,7 +21,8 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-builder.Services.AddHttpClient<IPhishtankApiService, PhishTankApiService>();
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<IPhishtankApiService, PhishTankApiService>();
 
 var app = builder.Build();
 

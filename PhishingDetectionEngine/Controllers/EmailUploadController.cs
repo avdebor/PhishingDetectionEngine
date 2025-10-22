@@ -13,10 +13,12 @@ namespace PhishingDetectionEngine.Controllers
     public class EmailUploadController : ControllerBase
     {
         private readonly IEmailParserService _emailParserService;
+        //private readonly IPhishtankApiService IPhishtankApiService;
 
-        public EmailUploadController(IEmailParserService emailParserService)
+        public EmailUploadController(IEmailParserService emailParserService, IPhishtankApiService phishtankApiService)
         {
             _emailParserService = emailParserService ?? throw new ArgumentNullException(nameof(emailParserService));
+            //IPhishtankApiService = phishtankApiService ?? throw new ArgumentNullException(nameof(phishtankApiService));
         }
 
         [HttpPost("upload")]
@@ -39,6 +41,9 @@ namespace PhishingDetectionEngine.Controllers
             {
                 var parsed = await _emailParserService.ParseAsync(request.File.FileName, stream);
                 return Ok(parsed);
+                // Perform Phishtank lookup test
+                //var test = await IPhishtankApiService.PerformLookup(parsed);
+                //return Ok(test);
             }
             catch (NotSupportedException nse)
             {

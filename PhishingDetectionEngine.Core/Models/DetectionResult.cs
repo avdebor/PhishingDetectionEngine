@@ -12,6 +12,5 @@ namespace PhishingDetectionEngine.Core.Models
         public int Percentage { get; set; }
         public List<string> Flags { get; set; } = new List<string>();
         public DateTime DateOfScan { get; set; }
-
     }
 }

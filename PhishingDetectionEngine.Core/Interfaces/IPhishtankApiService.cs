@@ -1,6 +1,6 @@
 using PhishingDetectionEngine.Core.Models;
 
-namespace PhishingDetectionEngine.Core.Interaces
+namespace PhishingDetectionEngine.Core.Interfaces
 {
     public interface IPhishtankApiService
     {

@@ -6,14 +6,19 @@ using System.Threading.Tasks;
 using PhishingDetectionEngine.Core.Models;
 using PhishingDetectionEngine.Core.Interfaces;
 using PhishingDetectionEngine.Core.Utilities;
-using PhishingDetectionEngine.Core.Interaces;
 
 namespace PhishingDetectionEngine.Core.ServiceModules
 {
     public class PhishTankApiService : IPhishtankApiService
     {
         private readonly HttpClient _httpClient;
-        private const string PhishTankEndpoint = "http://checkurl.dev.phishtank.com/checkurl/";
+        private const string PhishTankEndpoint = "http://checkurl.phishtank.com/checkurl/";
+
+        private static readonly HashSet<string> KnownSafeMsgUrls= new()
+        {
+            "http://schemas.microsoft.com/office/2004/12/omml",
+            "http://www.w3.org/TR/REC-html40"
+        };
 
         public PhishTankApiService(HttpClient httpClient)
         {
@@ -33,8 +38,13 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
             try
             {
-                // Extract URLs
-                var urlsToCheck = EmailUrlExtractor.ExtractUrls(email);
+                // Extract URLs + filter known safe URLs
+                var urlsToCheck = EmailUrlExtractor.ExtractUrls(email)
+                    .Where(u => !string.IsNullOrWhiteSpace(u) && 
+                    Uri.IsWellFormedUriString(u, UriKind.Absolute) &&
+                    !KnownSafeMsgUrls.Contains(u))
+                    .Distinct()
+                    .ToList();
 
                 if (urlsToCheck.Count == 0)
                 {
