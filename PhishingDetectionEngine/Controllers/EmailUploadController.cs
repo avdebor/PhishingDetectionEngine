@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using PhishingDetectionEngine.Core.Interfaces;
-using PhishingDetectionEngine.Core.Models;
+using PhishingDetectionEngine.Core;
 using System;
+using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -12,22 +12,19 @@ namespace PhishingDetectionEngine.Controllers
     [Route("api/[controller]")]
     public class EmailUploadController : ControllerBase
     {
-        private readonly IEmailParserService _emailParserService;
+        private readonly PhishingOrchestrator _orchestrator;
 
-        public EmailUploadController(IEmailParserService emailParserService)
+        public EmailUploadController(PhishingOrchestrator orchestrator)
         {
-            _emailParserService = emailParserService ?? throw new ArgumentNullException(nameof(emailParserService));
+            _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
         }
 
         [HttpPost("upload")]
         [Consumes("multipart/form-data")]
-        public async Task<IActionResult> Upload([FromForm] EmailUpload request)
+        public async Task<IActionResult> Upload([FromForm] EmailUploadRequest request)
         {
-            if (request?.File == null)
-                return BadRequest("No file provided.");
-
-            if (request.File.Length == 0)
-                return BadRequest("Empty file.");
+            if (request.File == null || request.File.Length == 0)
+                return BadRequest("No file or empty file provided.");
 
             var extension = Path.GetExtension(request.File.FileName)?.ToLowerInvariant();
             if (extension != ".eml" && extension != ".msg")
@@ -37,18 +34,19 @@ namespace PhishingDetectionEngine.Controllers
 
             try
             {
-                var parsed = await _emailParserService.ParseAsync(request.File.FileName, stream);
-                return Ok(parsed);
-            }
-            catch (NotSupportedException nse)
-            {
-                return StatusCode(StatusCodes.Status415UnsupportedMediaType, nse.Message);
+                var result = await _orchestrator.AnalyzeEmailAsync(request.File.FileName, stream);
+                return Ok(result);
             }
             catch (Exception ex)
             {
-                //TODO: add logger to catch upload errors
-                return StatusCode(StatusCodes.Status500InternalServerError, $"Error parsing email: {ex.Message}");
+                return StatusCode(StatusCodes.Status500InternalServerError, $"Error processing email: {ex.Message}");
             }
         }
+    }
+
+    public class EmailUploadRequest
+    {
+        [Required]
+        public IFormFile File { get; set; }
     }
 }
