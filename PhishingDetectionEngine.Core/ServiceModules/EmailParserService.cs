@@ -5,7 +5,7 @@ using PhishingDetectionEngine.Core.Models;
 using System.Diagnostics;
 
 
-namespace PhishingDetectionEngine.Core.Services
+namespace PhishingDetectionEngine.Core.ServiceModules
 {
     public class EmailParserService : IEmailParserService
     {

@@ -3,16 +3,12 @@ using Microsoft.OpenApi.Models;
 using PhishingDetectionEngine.Core;
 using PhishingDetectionEngine.Core.Interfaces;
 using PhishingDetectionEngine.Core.ServiceModules;
-using PhishingDetectionEngine.Core.Services;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // support legacy code pages (for some .msg parsing libraries)
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-
-// Register your email parser service (scoped is fine)
-builder.Services.AddScoped<IEmailParserService, EmailParserService>();
 
 // If you expect large uploads (zip or many emails), increase limits here.
 // You can remove or lower these values if not needed.
@@ -26,6 +22,7 @@ builder.Services.Configure<FormOptions>(options =>
 // Add controllers (uses System.Text.Json by default)
 builder.Services.AddControllers();
 builder.Services.AddScoped<PhishingOrchestrator>();
+builder.Services.AddScoped<EmailParserService>();
 
 
 // Swagger / OpenAPI

@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using PhishingDetectionEngine.Core;
+using PhishingDetectionEngine.Core.Models;
+using PhishingDetectionEngine.Core.ServiceModules;
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.IO;
@@ -13,10 +15,12 @@ namespace PhishingDetectionEngine.Controllers
     public class EmailUploadController : ControllerBase
     {
         private readonly PhishingOrchestrator _orchestrator;
+        private readonly EmailParserService _emailParserService;
 
-        public EmailUploadController(PhishingOrchestrator orchestrator)
+        public EmailUploadController(PhishingOrchestrator orchestrator, EmailParserService emailParserService)
         {
             _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
+            _emailParserService = emailParserService ?? throw new ArgumentNullException (nameof(emailParserService));
         }
 
         [HttpPost("upload")]
@@ -34,7 +38,8 @@ namespace PhishingDetectionEngine.Controllers
 
             try
             {
-                var result = await _orchestrator.AnalyzeEmailAsync(request.File.FileName, stream);
+                ParsedEmail parsedEmail = await _emailParserService.ParseAsync(request.File.FileName, stream);
+                var result = await _orchestrator.AnalyzeEmailAsync(parsedEmail);
                 return Ok(result);
             }
             catch (Exception ex)

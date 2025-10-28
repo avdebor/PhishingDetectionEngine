@@ -2,65 +2,78 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.Tasks;
 using PhishingDetectionEngine.Core.Models;
-using PhishingDetectionEngine.Core.Services;
+using PhishingDetectionEngine.Core.ServiceModules;
 
 namespace PhishingDetectionEngine.Core
 {
     public class PhishingOrchestrator
     {
-        private readonly EmailParserService _emailParser;
+        private readonly PhishTankApiService _phishTankApiService;
+        private readonly HttpClient _httpClient;
 
         public PhishingOrchestrator()
         {
-            _emailParser = new EmailParserService();
+            _httpClient = new HttpClient();
+            _phishTankApiService = new PhishTankApiService(_httpClient);
         }
 
-        public async Task<PhishingResult> AnalyzeEmailAsync(string fileName, Stream emailStream)
+        public async Task<DetectionResult> AnalyzeEmailAsync(ParsedEmail parsedEmail)
         {
-            var parsedEmail = await _emailParser.ParseAsync(fileName, emailStream);
 
-            var moduleScores = new List<ModuleScore>();
-
-            double basicScore = CalculatePhishingScore(parsedEmail);
-            moduleScores.Add(new ModuleScore { ModuleName = "BasicHeuristicModule", Score = basicScore });
-
-            double overallScore = CalculateOverallScore(moduleScores.Select(m => m.Score).ToList());
-
-            return new PhishingResult
+            var detectionTasks = new List<Task<DetectionResult>>
             {
-                OverallScore = overallScore,
-                ModuleScores = moduleScores
+                _phishTankApiService.PerformLookup(parsedEmail)
             };
+
+            var detectionResults = await Task.WhenAll(detectionTasks);
+
+            List<int> scores = new List<int>();
+
+            foreach (var result in detectionResults)
+            {
+                scores.Add(result.Percentage);
+            }
+
+            List<string> combinedFlags = new List<string>();
+
+            foreach (var result in detectionResults)
+            {
+                foreach (var flag in result.Flags)
+                {
+                    if (!combinedFlags.Contains(flag))
+                    {
+                        combinedFlags.Add(flag);
+                    }
+                }
+            }
+
+            int totalScore = CalculateOverallScore(scores);
+
+            DetectionResult finalDetectionResult = new DetectionResult
+            {
+                EmailSubject = parsedEmail.Subject,
+                Percentage = totalScore,
+                Flags = combinedFlags,
+                DateOfScan = DateTime.Now
+            };
+
+            return finalDetectionResult;
         }
 
-        private double CalculatePhishingScore(ParsedEmail email)
-        {
-            double score = 0;
-
-            if (email.Subject.Contains("urgent", StringComparison.OrdinalIgnoreCase)) score += 20;
-            if (email.Subject.Contains("verify", StringComparison.OrdinalIgnoreCase)) score += 20;
-            if (email.TextBody.Contains("click here", StringComparison.OrdinalIgnoreCase)) score += 20;
-            if (email.TextBody.Contains("password", StringComparison.OrdinalIgnoreCase)) score += 20;
-            if (email.From.Contains("@unknown-domain.com", StringComparison.OrdinalIgnoreCase)) score += 20;
-
-            return Math.Min(score, 100);
-        }
-
-        private double CalculateOverallScore(List<double> scores)
+        private int CalculateOverallScore(List<int> scores)
         {
             if (scores == null || scores.Count == 0)
                 return 0;
 
             double product = 1;
             foreach (var s in scores)
-            {
                 product *= (1 - s / 100.0);
-            }
 
-            double result = (1 - product) * 100;
-            return Math.Round(result, 2);
+            int result = (int)Math.Round((1 - product) * 100);
+            return result;
         }
     }
 }

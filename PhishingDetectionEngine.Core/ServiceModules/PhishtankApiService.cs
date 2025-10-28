@@ -78,7 +78,6 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             {
                 detectionResult.Flags.Add($"Error during PhishTank scan: {ex.Message}");
             }
-
             return detectionResult;
         }
         private async Task<bool> CheckUrlWithPhishTank(string url)

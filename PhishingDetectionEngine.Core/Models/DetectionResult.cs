@@ -13,4 +13,5 @@ namespace PhishingDetectionEngine.Core.Models
         public List<string> Flags { get; set; } = new List<string>();
         public DateTime DateOfScan { get; set; }
     }
+ 
 }
