@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.OpenApi.Models;
 using PhishingDetectionEngine.Core;
 using PhishingDetectionEngine.Core.Interfaces;
+using PhishingDetectionEngine.Core.ServiceModules;
 using PhishingDetectionEngine.Core.Services;
 using System.Text;
 
@@ -41,6 +42,9 @@ builder.Services.AddSwaggerGen(c =>
     // No extra packages required — Swashbuckle will map IFormFile
     // when it is used directly as [FromForm] IFormFile parameter.
 });
+
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<IPhishtankApiService, PhishTankApiService>();
 
 var app = builder.Build();
 
