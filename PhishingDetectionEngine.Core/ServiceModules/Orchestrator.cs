@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using PhishingDetectionEngine.Core.Interfaces;
 using PhishingDetectionEngine.Core.Models;
 using PhishingDetectionEngine.Core.ServiceModules;
 
@@ -11,20 +12,20 @@ namespace PhishingDetectionEngine.Core
 {
     public class PhishingOrchestrator
     {
-        private readonly PhishTankApiService _phishTankApiService;
+        private readonly IUrlService _urlService;
         private readonly HttpClient _httpClient;
 
-        public PhishingOrchestrator()
+        public PhishingOrchestrator(HttpClient httpClient, IUrlService urlService)
         {
-            _httpClient = new HttpClient();
-            _phishTankApiService = new PhishTankApiService(_httpClient);
+            _httpClient = httpClient;
+            _urlService = urlService;
         }
 
         public async Task<DetectionResult> AnalyzeEmailAsync(ParsedEmail parsedEmail)
         {           
             var detectionTasks = new List<Task<DetectionResult>>
             {
-                _phishTankApiService.PerformLookup(parsedEmail)
+                _urlService.PerformLookup(parsedEmail)
             };
 
             var detectionResults = await Task.WhenAll(detectionTasks);
