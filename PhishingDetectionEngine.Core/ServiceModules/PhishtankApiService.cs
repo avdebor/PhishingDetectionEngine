@@ -68,10 +68,14 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
                     // Add detection flags
                     phishingUrls.ForEach(url => detectionResult.Flags.Add($"Phishing URL detected: {url}"));
-                    detectionResult.Flags.Add($"Scanned {urlsToCheck.Count} URLs");
+                    detectionResult.Flags.Add($"Scanned {urlsToCheck.Count} URL's");
 
                     // Set percentage (100% if any phishing found)
-                    detectionResult.Percentage = phishingUrls.Any() ? 100 : 0;
+                    detectionResult.Percentage = phishingUrls.Any() ? 100 : 25; //return 25 in case if any URLs are located
+                    if (detectionResult.Percentage == 25)
+                    {
+                        detectionResult.Flags.Add("Url's scanned by phishtank not flagged as phishing, URL's are possibly malicious!");
+                    }
                 }
             }
             catch (Exception ex)

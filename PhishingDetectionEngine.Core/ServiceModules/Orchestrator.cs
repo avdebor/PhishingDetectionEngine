@@ -21,8 +21,7 @@ namespace PhishingDetectionEngine.Core
         }
 
         public async Task<DetectionResult> AnalyzeEmailAsync(ParsedEmail parsedEmail)
-        {
-
+        {           
             var detectionTasks = new List<Task<DetectionResult>>
             {
                 _phishTankApiService.PerformLookup(parsedEmail)
