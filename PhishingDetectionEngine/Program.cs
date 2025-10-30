@@ -36,12 +36,12 @@ builder.Services.AddSwaggerGen(c =>
     });
 
     // Optionally, ensure file upload parameters are handled.
-    // No extra packages required — Swashbuckle will map IFormFile
+    // No extra packages required ï¿½ Swashbuckle will map IFormFile
     // when it is used directly as [FromForm] IFormFile parameter.
 });
 
 builder.Services.AddHttpClient();
-builder.Services.AddScoped<IPhishtankApiService, PhishTankApiService>();
+builder.Services.AddScoped<IUrlService, UrlService>();
 
 var app = builder.Build();
 
