@@ -71,11 +71,11 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 {
                     if (result.IsPhishing)
                     {
-                        detectionResult.Flags.Add($"PHISHING CONFIRMED: {result.Url}");
+                        detectionResult.Flags.Add($"Phishing Confirmed by PhishStats: {result.Url}");
                     }
                     else
                     {
-                        detectionResult.Flags.Add($"CLEAN: {result.Url}");
+                        detectionResult.Flags.Add($"Not present in PhishStats database, possibly phishing: {result.Url}");
                     }
                 }
 
@@ -90,7 +90,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 }
                 else
                 {
-                    detectionResult.Flags.Add($"Phishing detected: {phishingUrls.Count} URL(s) flagged");
+                    detectionResult.Flags.Add($"Phishing detected by PhishStats: {phishingUrls.Count} URL(s) flagged");
                 }
             }
             catch (Exception ex)
