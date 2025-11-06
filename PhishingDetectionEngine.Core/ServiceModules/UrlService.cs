@@ -82,7 +82,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 detectionResult.Flags.Add($"Scanned {urlsToCheck.Count} URL(s) using PhishStats");
 
                 // Set percentage (100% if any phishing found)
-                detectionResult.Percentage = phishingUrls.Any() ? 100 : 25;
+                detectionResult.Percentage = phishingUrls.Any() ? 100 : 50;
                 
                 if (detectionResult.Percentage == 25)
                 {
