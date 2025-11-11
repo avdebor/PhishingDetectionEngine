@@ -126,7 +126,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             {
                 flags.Add($"Domain does not exist: {domain}");
                 flags.Add("HIGH RISK: Non-existent domain - likely phishing");
-                riskScore += 80;
+                riskScore += 85; // CHANGED: 80 → 85
                 return riskScore;
             }
 
@@ -157,7 +157,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 {
                     flags.Add($"Root domain also does not exist: {rootDomain}");
                     flags.Add("HIGH RISK: Non-existent domain - likely phishing");
-                    riskScore += 80;
+                    riskScore += 85; // CHANGED: 80 → 85
                 }
             }
             catch (Exception ex)
@@ -181,7 +181,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             {
                 flags.Add("Subdomain does not resolve in DNS - suspicious");
                 flags.Add("Could be non-existent or malicious subdomain");
-                riskScore += 30;
+                riskScore += 35; // CHANGED: 30 → 35
                 return riskScore;
             }
 
@@ -194,7 +194,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             {
                 flags.Add($"HIGH RISK: Subdomain uses different IP ({ipComparison.SubdomainIP}) than root domain ({ipComparison.RootDomainIP})");
                 flags.Add("Possible compromised subdomain or phishing setup");
-                riskScore += 50;
+                riskScore += 45; // CHANGED: 50 → 45
             }
             else
             {
@@ -262,7 +262,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             if (highRiskPatterns.Any(pattern => subdomainPart.Contains(pattern)))
             {
                 flags.Add($"HIGH RISK: Suspicious subdomain pattern: {subdomainPart}");
-                riskScore += 40;
+                riskScore += 40; // UNCHANGED
             }
 
             return riskScore;
@@ -320,12 +320,12 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             if (domainAge.TotalDays < 30)
             {
                 flags.Add($"HIGH RISK: Domain is very new: {domainAge.TotalDays:F0} days old");
-                riskScore += 60;
+                riskScore += 55; // CHANGED: 60 → 55
             }
             else if (domainAge.TotalDays < 365)
             {
                 flags.Add($"MEDIUM RISK: Domain is less than a year old: {domainAge.TotalDays:F0} days old");
-                riskScore += 30;
+                riskScore += 30; // UNCHANGED
             }
             else
             {
@@ -354,13 +354,13 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             var registrarRisk = CalculateRegistrarRisk(registrar);
             riskScore += registrarRisk;
 
-            if (registrarRisk > 6)
+            if (registrarRisk >= 5)
             {
-                flags.Add($"HIGH RISK: Suspicious registrar characteristics: {whoisResponse.Registrar.Name}");
+                flags.Add($"Suspicious registrar characteristics: {whoisResponse.Registrar.Name}");
             }
-            else if (registrarRisk > 3)
+            else if (registrarRisk >= 3)
             {
-                flags.Add($"MEDIUM RISK: Questionable registrar: {whoisResponse.Registrar.Name}");
+                flags.Add($"Questionable registrar: {whoisResponse.Registrar.Name}");
             }
 
             return riskScore;
@@ -390,7 +390,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             if (IsWhoisPrivacyEnabled(whoisResponse))
             {
                 flags.Add("MEDIUM RISK: WHOIS privacy protection enabled");
-                riskScore += 25;
+                riskScore += 25; // UNCHANGED
             }
 
             return riskScore;
@@ -419,13 +419,13 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             if (statuses.Any(s => s.Contains("pendingdelete") || s.Contains("redemption")))
             {
                 flags.Add("HIGH RISK: Domain in pending delete status");
-                riskScore += 70;
+                riskScore += 80; 
             }
 
             if (statuses.Any(s => s.Contains("ok") || s.Contains("active")))
             {
                 flags.Add("Domain status: Active");
-                riskScore -= 5; // Positive indicator
+                riskScore -= 5;
             }
 
             return riskScore;
@@ -442,12 +442,15 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
             var tldRisk = CalculateTldRisk(tld);
             riskScore += tldRisk;
-
-            if (tldRisk > 7)
-                flags.Add($"HIGH RISK: Suspicious TLD characteristics: .{tld}");
-            else if (tldRisk > 4)
-                flags.Add($"MEDIUM RISK: Questionable TLD: .{tld}");
-
+            
+            if (tldRisk >= 6)
+            {
+                flags.Add($"Suspicious TLD characteristics: .{tld}");
+            }
+            else if (tldRisk >= 4)
+            {
+                flags.Add($"Questionable TLD: .{tld}");
+            }
             return riskScore;
         }
 
@@ -483,7 +486,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             if (domainName.Contains('-') && domainName.Split('-').Length >= 2)
             {
                 flags.Add($"MEDIUM RISK: Multi-part domain name - possible impersonation: {domainName}");
-                riskScore += 20;
+                riskScore += 20; // UNCHANGED
             }
 
             return riskScore;
@@ -502,14 +505,14 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             }
 
             var nameServers = whoisResponse.NameServers.Select(ns => ns.ToLower());
-
             var nameServerRisk = CalculateNameServerRisk(nameServers);
             riskScore += nameServerRisk;
 
-            if (nameServerRisk > 5)
-                flags.Add("HIGH RISK: Suspicious name server characteristics");
-            else if (nameServerRisk > 2)
-                flags.Add("MEDIUM RISK: Questionable name servers");
+            // PROPER THRESHOLDS FOR LOW-RISK CATEGORY (0-15 points)
+            if (nameServerRisk >= 12)
+                flags.Add("Suspicious name server characteristics"); // No "HIGH RISK" - it's Low-Risk!
+            else if (nameServerRisk >= 8)
+                flags.Add("Questionable name servers"); // No "MEDIUM RISK" - it's Low-Risk!
 
             return riskScore;
         }
@@ -519,16 +522,17 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             int score = 0;
 
             // Free/cheap hosting providers
-            if (nameServers.Any(ns => ns.Contains("free") || ns.Contains("cheap"))) score += 3;
+            if (nameServers.Any(ns => ns.Contains("free") || ns.Contains("cheap"))) score += 6;
 
             // New/uncommon providers
-            if (nameServers.Any(ns => ns.Length < 6)) score += 2;
+            if (nameServers.Any(ns => ns.Length < 6)) score += 4;
 
             // Multiple different providers
             var uniqueProviders = nameServers.Select(ns => ns.Split('.')[^2]).Distinct().Count();
-            if (uniqueProviders > 3) score += 2;
+            if (uniqueProviders > 3) score += 3;
 
-            return score;
+            // Cap at Low-Risk maximum
+            return Math.Min(score, 15);
         }
 
         // Check if contact information is hidden or generic
@@ -542,13 +546,13 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             if (IsGenericContactEmail(registrantEmail) || IsGenericContactEmail(adminEmail))
             {
                 flags.Add("MEDIUM RISK: Generic or privacy-protected contact email");
-                riskScore += 20;
+                riskScore += 20; // UNCHANGED
             }
 
             if (string.IsNullOrEmpty(whoisResponse.Registrant?.Organization))
             {
                 flags.Add("No organization information provided");
-                riskScore += 15;
+                riskScore += 15; // UNCHANGED
             }
 
             return riskScore;
