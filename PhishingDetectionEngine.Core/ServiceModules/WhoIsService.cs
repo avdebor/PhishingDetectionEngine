@@ -61,6 +61,8 @@ namespace PhishingDetectionEngine.Core.ServiceModules
         private async Task<DetectionResult> AnalyzeWhoIsResponse(WhoisResponse whoisResponse, string domain, string subject)
         {
             var flags = new List<string>();
+            var riskScore = 0;
+            var maxRiskScore = 100;
 
             // Debug output for testing
             Console.WriteLine($"Analyzing domain: {domain}");
@@ -77,39 +79,45 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             if (whoisResponse == null)
             {
                 flags.Add("No WHOIS response received");
+                riskScore += 20;
             }
             else if (whoisResponse.Status == WhoisStatus.NotFound)
             {
                 // Handle subdomains and non-existent domains
-                await HandlePossibleSubdomain(domain, flags);
+                riskScore += await HandlePossibleSubdomain(domain, flags);
             }
             else
             {
                 // Domain exists - run all security checks
                 flags.Add("Domain exists in WHOIS database");
 
-                // Run all phishing detection checks
-                AnalyzeDomainAge(whoisResponse, flags);
-                AnalyzeRegistrar(whoisResponse, flags);
-                AnalyzeWhoisPrivacy(whoisResponse, flags);
-                AnalyzeDomainStatus(whoisResponse, flags);
-                AnalyzeTLD(domain, flags);
-                AnalyzeBrandImpersonation(domain, flags);
-                AnalyzeNameServers(whoisResponse, flags);
-                AnalyzeContactInformation(whoisResponse, flags);
+                // Run all phishing detection checks and accumulate risk scores
+                riskScore += AnalyzeDomainAge(whoisResponse, flags);
+                riskScore += AnalyzeRegistrar(whoisResponse, flags);
+                riskScore += AnalyzeWhoisPrivacy(whoisResponse, flags);
+                riskScore += AnalyzeDomainStatus(whoisResponse, flags);
+                riskScore += AnalyzeTLD(domain, flags);
+                riskScore += AnalyzeBrandImpersonation(domain, flags);
+                riskScore += AnalyzeNameServers(whoisResponse, flags);
+                riskScore += AnalyzeContactInformation(whoisResponse, flags);
             }
+
+            // Calculate percentage (0% = safe, 100% = high risk)
+            var percentage = Math.Min(riskScore, maxRiskScore);
 
             return new DetectionResult
             {
                 EmailSubject = subject,
-                Percentage = 0,
+                Percentage = percentage,
                 Flags = flags,
                 DateOfScan = DateTime.Now
             };
         }
 
-        private async Task HandlePossibleSubdomain(string domain, List<string> flags)
+        private async Task<int> HandlePossibleSubdomain(string domain, List<string> flags)
         {
+            var riskScore = 0;
+
             // Extract root domain (e.g., eu.knowbe4.com -> knowbe4.com)
             var rootDomain = GetRootDomain(domain);
 
@@ -118,7 +126,8 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             {
                 flags.Add($"Domain does not exist: {domain}");
                 flags.Add("HIGH RISK: Non-existent domain - likely phishing");
-                return;
+                riskScore += 80;
+                return riskScore;
             }
 
             // It's a subdomain - check if root domain exists
@@ -134,31 +143,37 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                     flags.Add($"Root domain exists: {rootDomain}");
 
                     // Analyze root domain for context
-                    AnalyzeDomainAge(rootWhoisResponse, flags);
-                    AnalyzeRegistrar(rootWhoisResponse, flags);
-                    AnalyzeWhoisPrivacy(rootWhoisResponse, flags);
-                    AnalyzeDomainStatus(rootWhoisResponse, flags);
-                    AnalyzeTLD(rootDomain, flags);
-                    AnalyzeBrandImpersonation(rootDomain, flags);
+                    riskScore += AnalyzeDomainAge(rootWhoisResponse, flags);
+                    riskScore += AnalyzeRegistrar(rootWhoisResponse, flags);
+                    riskScore += AnalyzeWhoisPrivacy(rootWhoisResponse, flags);
+                    riskScore += AnalyzeDomainStatus(rootWhoisResponse, flags);
+                    riskScore += AnalyzeTLD(rootDomain, flags);
+                    riskScore += AnalyzeBrandImpersonation(rootDomain, flags);
 
                     // Check if subdomain is suspicious
-                    await AnalyzeSubdomainRisk(domain, rootDomain, flags);
+                    riskScore += await AnalyzeSubdomainRisk(domain, rootDomain, flags);
                 }
                 else
                 {
                     flags.Add($"Root domain also does not exist: {rootDomain}");
                     flags.Add("HIGH RISK: Non-existent domain - likely phishing");
+                    riskScore += 80;
                 }
             }
             catch (Exception ex)
             {
                 flags.Add($"Could not verify root domain: {ex.Message}");
                 flags.Add("Assuming high risk due to verification failure");
+                riskScore += 40;
             }
+
+            return riskScore;
         }
 
-        private async Task AnalyzeSubdomainRisk(string subdomain, string rootDomain, List<string> flags)
+        private async Task<int> AnalyzeSubdomainRisk(string subdomain, string rootDomain, List<string> flags)
         {
+            var riskScore = 0;
+
             // Check if subdomain actually resolves in DNS
             var subdomainResolves = await ValidateDomainExists(subdomain);
 
@@ -166,7 +181,8 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             {
                 flags.Add("Subdomain does not resolve in DNS - suspicious");
                 flags.Add("Could be non-existent or malicious subdomain");
-                return;
+                riskScore += 30;
+                return riskScore;
             }
 
             flags.Add("Subdomain resolves in DNS");
@@ -178,14 +194,18 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             {
                 flags.Add($"HIGH RISK: Subdomain uses different IP ({ipComparison.SubdomainIP}) than root domain ({ipComparison.RootDomainIP})");
                 flags.Add("Possible compromised subdomain or phishing setup");
+                riskScore += 50;
             }
             else
             {
                 flags.Add("Subdomain uses same IP as root domain - likely legitimate");
+                riskScore -= 10; // Positive indicator
             }
 
             // Check for suspicious subdomain names
-            AnalyzeSubdomainPatterns(subdomain, rootDomain, flags);
+            riskScore += AnalyzeSubdomainPatterns(subdomain, rootDomain, flags);
+
+            return riskScore;
         }
 
         private async Task<bool> ValidateDomainExists(string domain)
@@ -227,8 +247,9 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             }
         }
 
-        private void AnalyzeSubdomainPatterns(string fullDomain, string rootDomain, List<string> flags)
+        private int AnalyzeSubdomainPatterns(string fullDomain, string rootDomain, List<string> flags)
         {
+            var riskScore = 0;
             var subdomainPart = fullDomain.Replace($".{rootDomain}", "").ToLower();
 
             // Check for suspicious subdomain names
@@ -241,7 +262,10 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             if (highRiskPatterns.Any(pattern => subdomainPart.Contains(pattern)))
             {
                 flags.Add($"HIGH RISK: Suspicious subdomain pattern: {subdomainPart}");
+                riskScore += 40;
             }
+
+            return riskScore;
         }
 
         private string GetRootDomain(string domain)
@@ -281,51 +305,65 @@ namespace PhishingDetectionEngine.Core.ServiceModules
         }
 
         // Check if domain is very new (common in phishing)
-        private void AnalyzeDomainAge(WhoisResponse whoisResponse, List<string> flags)
+        private int AnalyzeDomainAge(WhoisResponse whoisResponse, List<string> flags)
         {
+            var riskScore = 0;
+
             if (!whoisResponse.Registered.HasValue)
             {
                 flags.Add("Domain registration date unknown");
-                return;
+                riskScore += 10;
+                return riskScore;
             }
 
             var domainAge = DateTime.Now - whoisResponse.Registered.Value;
             if (domainAge.TotalDays < 30)
             {
                 flags.Add($"HIGH RISK: Domain is very new: {domainAge.TotalDays:F0} days old");
+                riskScore += 60;
             }
             else if (domainAge.TotalDays < 365)
             {
                 flags.Add($"MEDIUM RISK: Domain is less than a year old: {domainAge.TotalDays:F0} days old");
+                riskScore += 30;
             }
             else
             {
                 flags.Add("Domain is older than a year");
+                riskScore -= 10; // Positive indicator
             }
+
+            return riskScore;
         }
 
         // Check if registrar is commonly used for phishing
-        private void AnalyzeRegistrar(WhoisResponse whoisResponse, List<string> flags)
+        private int AnalyzeRegistrar(WhoisResponse whoisResponse, List<string> flags)
         {
+            var riskScore = 0;
+
             if (string.IsNullOrEmpty(whoisResponse.Registrar?.Name))
             {
                 flags.Add("Registrar information hidden or unavailable");
-                return;
+                riskScore += 15;
+                return riskScore;
             }
 
             var registrar = whoisResponse.Registrar.Name.ToLower();
 
             // Score registrar based on risk characteristics
-            var riskScore = CalculateRegistrarRisk(registrar);
+            var registrarRisk = CalculateRegistrarRisk(registrar);
+            riskScore += registrarRisk;
 
-            if (riskScore > 6)
+            if (registrarRisk > 6)
             {
                 flags.Add($"HIGH RISK: Suspicious registrar characteristics: {whoisResponse.Registrar.Name}");
             }
-            else if (riskScore > 3)
+            else if (registrarRisk > 3)
             {
                 flags.Add($"MEDIUM RISK: Questionable registrar: {whoisResponse.Registrar.Name}");
             }
+
+            return riskScore;
         }
 
         private int CalculateRegistrarRisk(string registrar)
@@ -345,21 +383,29 @@ namespace PhishingDetectionEngine.Core.ServiceModules
         }
 
         // Check if WHOIS privacy is enabled (hides owner identity)
-        private void AnalyzeWhoisPrivacy(WhoisResponse whoisResponse, List<string> flags)
+        private int AnalyzeWhoisPrivacy(WhoisResponse whoisResponse, List<string> flags)
         {
+            var riskScore = 0;
+
             if (IsWhoisPrivacyEnabled(whoisResponse))
             {
                 flags.Add("MEDIUM RISK: WHOIS privacy protection enabled");
+                riskScore += 25;
             }
+
+            return riskScore;
         }
 
         // Check domain status (suspended, pending delete, etc.)
-        private void AnalyzeDomainStatus(WhoisResponse whoisResponse, List<string> flags)
+        private int AnalyzeDomainStatus(WhoisResponse whoisResponse, List<string> flags)
         {
+            var riskScore = 0;
+
             if (whoisResponse.DomainStatus == null || !whoisResponse.DomainStatus.Any())
             {
                 flags.Add("No domain status information available");
-                return;
+                riskScore += 10;
+                return riskScore;
             }
 
             var statuses = whoisResponse.DomainStatus.Select(s => s.ToLower()).ToList();
@@ -367,33 +413,42 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             if (statuses.Any(s => s.Contains("clienthold") || s.Contains("serverhold")))
             {
                 flags.Add("HIGH RISK: Domain has hold status - may be suspended");
+                riskScore += 50;
             }
 
             if (statuses.Any(s => s.Contains("pendingdelete") || s.Contains("redemption")))
             {
                 flags.Add("HIGH RISK: Domain in pending delete status");
+                riskScore += 70;
             }
 
             if (statuses.Any(s => s.Contains("ok") || s.Contains("active")))
             {
                 flags.Add("Domain status: Active");
+                riskScore -= 5; // Positive indicator
             }
+
+            return riskScore;
         }
 
         // Check if TLD is risky (new, uncommon, numeric)
-        private void AnalyzeTLD(string domain, List<string> flags)
+        private int AnalyzeTLD(string domain, List<string> flags)
         {
+            var riskScore = 0;
             var domainParts = domain.Split('.');
-            if (domainParts.Length <= 1) return;
+            if (domainParts.Length <= 1) return riskScore;
 
             var tld = domainParts.Last().ToLower();
 
-            var riskScore = CalculateTldRisk(tld);
+            var tldRisk = CalculateTldRisk(tld);
+            riskScore += tldRisk;
 
-            if (riskScore > 7)
+            if (tldRisk > 7)
                 flags.Add($"HIGH RISK: Suspicious TLD characteristics: .{tld}");
-            else if (riskScore > 4)
+            else if (tldRisk > 4)
                 flags.Add($"MEDIUM RISK: Questionable TLD: .{tld}");
+
+            return riskScore;
         }
 
         private int CalculateTldRisk(string tld)
@@ -414,34 +469,49 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
         private bool IsCommonTld(string tld)
         {
-            return tld.Length <= 3 || tld == "com" || tld == "org" || tld == "net";
+            var commonTlds = new[] { "com", "org", "net", "edu", "gov", "mil", "int" };
+            return commonTlds.Contains(tld) || tld.Length <= 3;
         }
 
-        // Check for fake brand domains.
-        private void AnalyzeBrandImpersonation(string domain, List<string> flags)
+        // Check for fake brand domains
+        private int AnalyzeBrandImpersonation(string domain, List<string> flags)
         {
+            var riskScore = 0;
             var domainName = domain.Split('.')[0].ToLower();
 
-            // check for domains that look like "something-" pattern
+            // Check for domains that look like "something-" pattern
             if (domainName.Contains('-') && domainName.Split('-').Length >= 2)
             {
                 flags.Add($"MEDIUM RISK: Multi-part domain name - possible impersonation: {domainName}");
+                riskScore += 20;
             }
+
+            return riskScore;
         }
 
         // Check if name servers are suspicious
-        private void AnalyzeNameServers(WhoisResponse whoisResponse, List<string> flags)
+        private int AnalyzeNameServers(WhoisResponse whoisResponse, List<string> flags)
         {
-            if (whoisResponse.NameServers?.Any() != true) return;
+            var riskScore = 0;
+
+            if (whoisResponse.NameServers?.Any() != true)
+            {
+                flags.Add("No name server information available");
+                riskScore += 10;
+                return riskScore;
+            }
 
             var nameServers = whoisResponse.NameServers.Select(ns => ns.ToLower());
 
-            var riskScore = CalculateNameServerRisk(nameServers);
+            var nameServerRisk = CalculateNameServerRisk(nameServers);
+            riskScore += nameServerRisk;
 
-            if (riskScore > 5)
+            if (nameServerRisk > 5)
                 flags.Add("HIGH RISK: Suspicious name server characteristics");
-            else if (riskScore > 2)
+            else if (nameServerRisk > 2)
                 flags.Add("MEDIUM RISK: Questionable name servers");
+
+            return riskScore;
         }
 
         private int CalculateNameServerRisk(IEnumerable<string> nameServers)
@@ -462,20 +532,26 @@ namespace PhishingDetectionEngine.Core.ServiceModules
         }
 
         // Check if contact information is hidden or generic
-        private void AnalyzeContactInformation(WhoisResponse whoisResponse, List<string> flags)
+        private int AnalyzeContactInformation(WhoisResponse whoisResponse, List<string> flags)
         {
+            var riskScore = 0;
+
             var registrantEmail = whoisResponse.Registrant?.Email?.ToLower() ?? "";
             var adminEmail = whoisResponse.AdminContact?.Email?.ToLower() ?? "";
 
             if (IsGenericContactEmail(registrantEmail) || IsGenericContactEmail(adminEmail))
             {
                 flags.Add("MEDIUM RISK: Generic or privacy-protected contact email");
+                riskScore += 20;
             }
 
             if (string.IsNullOrEmpty(whoisResponse.Registrant?.Organization))
             {
                 flags.Add("No organization information provided");
+                riskScore += 15;
             }
+
+            return riskScore;
         }
 
         private bool IsGenericContactEmail(string email)
