@@ -42,6 +42,7 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<IUrlService, UrlService>();
+builder.Services.AddScoped<IWhoIsService, WhoIsService>();
 
 var app = builder.Build();
 

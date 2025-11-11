@@ -14,18 +14,21 @@ namespace PhishingDetectionEngine.Core
     {
         private readonly IUrlService _urlService;
         private readonly HttpClient _httpClient;
+        private readonly IWhoIsService _whoIsService;
 
-        public PhishingOrchestrator(HttpClient httpClient, IUrlService urlService)
+        public PhishingOrchestrator(HttpClient httpClient, IUrlService urlService, IWhoIsService whoIsService)
         {
             _httpClient = httpClient;
             _urlService = urlService;
+            _whoIsService = whoIsService;
         }
 
         public async Task<DetectionResult> AnalyzeEmailAsync(ParsedEmail parsedEmail)
-        {           
+        {
             var detectionTasks = new List<Task<DetectionResult>>
             {
-                _urlService.PerformLookup(parsedEmail)
+                _urlService.PerformLookup(parsedEmail),
+                _whoIsService.AnalyzeDomainAsync(parsedEmail)
             };
 
             var detectionResults = await Task.WhenAll(detectionTasks);
