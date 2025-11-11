@@ -10,5 +10,6 @@
 		<PackageReference Include="MimeKit" Version="4.14.0" />
 		<PackageReference Include="MsgReader" Version="6.0.5" />
 		<PackageReference Include="OpenMcdf" Version="3.0.3" />
+		<PackageReference Include="Whois" Version="3.0.1" />
 	</ItemGroup>
 </Project>
