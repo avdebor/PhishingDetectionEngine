@@ -22,7 +22,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 "mobiele nummer", "telefoonnummer", "bankgegevens", "inloggegevens",
                 "wachtwoord", "beveiligingscode", "verificatiecode", "sms code",
                 "authenticatie", "account", "betaalgegevens", "creditcard",
-                "pin code", "identiteitsbewijs", "bsn nummer", "sofi nummer",
+                "pin code", "identiteitsbewijs", "bsn", "bsn nummer", "sofi nummer",
                 "herinnering", "dringend", "onmiddellijk", "dringende actie",
                 "bevestiging", "update", "onderhoud", "probleem",
                 "verdacht", "ongebruikelijk", "activiteit", "inbreuk",
@@ -31,7 +31,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 "betaling", "transactie", "overschrijving", "limiet",
                 "premie", "korting", "aanbieding", "winnaar",
                 "prijs", "lottery", "geluksvogel", "gratis",
-                "urgent", "belangrijk", "aandacht", "waarschuwing"
+                "urgent", "belangrijk", "aandacht", "waarschuwing", "WhatsApp-nummer"
             };
 
             // English suspicious words
@@ -51,7 +51,14 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 "confirm your", "validate your", "secure your", "protect your",
                 "banking", "financial", "personal information", "social security",
                 "credit card", "debit card", "paypal", "bitcoin",
-                "crypto", "password reset", "account recovery", "unlock account"
+                "crypto", "password reset", "account recovery", "unlock account",
+                "activate", "accept", "AI", "awards", "award", "security",
+                "verification", "authentication", "validation",
+                "confirm", "verify", "authenticate", "validate",
+                "password", "pin", "code", "token",
+                "2fa", "two factor", "multi factor", "biometric",
+                "encryption", "secure", "protected", "safety", "securing",
+                "start"
             };
 
             // Urgent action words
@@ -70,12 +77,14 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 "confirm", "verify", "authenticate", "validate",
                 "password", "pin", "code", "token",
                 "2fa", "two factor", "multi factor", "biometric",
-                "encryption", "secure", "protected", "safety"
+                "encryption", "secure", "protected", "safety", "securing"
             };
         }
 
         public async Task<DetectionResult> AnalyzeContent(ParsedEmail email)
         {
+            Console.WriteLine(email.TextBody);
+
             var detectionResult = new DetectionResult
             {
                 EmailSubject = email?.Subject ?? "No subject",
@@ -92,7 +101,9 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                     return detectionResult;
                 }
 
-                var textToAnalyze = $"{email.Subject} {email.TextBody}";                
+                var textToAnalyze = $"{email.Subject} {email.HtmlBody}";
+                Console.WriteLine("email text body : " + email.TextBody);
+                Console.WriteLine(String.IsNullOrEmpty(email.TextBody));      
                 var foundWords = FindSuspiciousWords(textToAnalyze);
                 var riskScore = CalculateRiskScore(foundWords, textToAnalyze);
                 
@@ -111,17 +122,27 @@ namespace PhishingDetectionEngine.Core.ServiceModules
         private Dictionary<string, int> FindSuspiciousWords(string text)
         {
             var foundWords = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            
+
+            string[] words = text.Split(' ');
+            foreach (var word in words)
+            {
+                Console.WriteLine(word);
+            }
+
+            Console.WriteLine("------Dutch words------");
             foreach (var word in _suspiciousWordsDutch)
             {
+                // Console.WriteLine(word);
                 if (text.Contains(word, StringComparison.OrdinalIgnoreCase))
                 {
                     foundWords[word] = GetWordRiskLevel(word);
                 }
             }
 
+            Console.WriteLine("------English words------");
             foreach (var word in _suspiciousWordsEnglish)
             {
+                // Console.WriteLine(word);
                 if (text.Contains(word, StringComparison.OrdinalIgnoreCase))
                 {
                     foundWords[word] = GetWordRiskLevel(word);
@@ -162,25 +183,24 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             if (!foundWords.Any())
                 return 0;
 
-            int baseScore = 0;
-            foreach (var word in foundWords)
-            {
-                baseScore += word.Value * 5;
-            }
+            bool hasUrgency = ContainsUrgentLanguage(text);
 
-            int highRiskWordCount = foundWords.Count(w => w.Value >= 2);
-            if (highRiskWordCount >= 3)
-            {
-                baseScore += 20;
-            }
+            // If ANY suspicious word is found, start at 60
+            int score = 60;
 
-            if (ContainsUrgentLanguage(text))
-            {
-                baseScore += 15;
-            }
+            // Count occurrences or weight based on risk level
+            int repetitionBonus = foundWords.Count * 10; // each word adds +10
 
-            return Math.Min(baseScore, 100);
+            score += repetitionBonus;
+
+            // If urgency + suspicious content -> maximum risk
+            if (hasUrgency)
+                return 100;
+
+            // Cap at 95 to leave urgency as the only way to hit 100
+            return Math.Min(score, 95);
         }
+
 
         private bool ContainsUrgentLanguage(string text)
         {
