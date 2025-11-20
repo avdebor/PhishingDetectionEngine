@@ -116,5 +116,8 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 throw new Exception($"Error checking URL with PhishStats: {ex.Message}");
             }
         }
+
+        //check google forms
+        //check whats app link
     }
 }

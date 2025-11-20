@@ -118,7 +118,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
         {
             var riskScore = 0;
 
-            // Extract root domain (e.g., eu.knowbe4.com -> knowbe4.com)
+            // Extract root domain
             var rootDomain = GetRootDomain(domain);
 
             // If same, it's truly non-existent
@@ -126,7 +126,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             {
                 flags.Add($"Domain does not exist: {domain}");
                 flags.Add("HIGH RISK: Non-existent domain - likely phishing");
-                riskScore += 85; // CHANGED: 80 → 85
+                riskScore += 85;
                 return riskScore;
             }
 
@@ -149,15 +149,14 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                     riskScore += AnalyzeDomainStatus(rootWhoisResponse, flags);
                     riskScore += AnalyzeTLD(rootDomain, flags);
                     riskScore += AnalyzeBrandImpersonation(rootDomain, flags);
-
-                    // Check if subdomain is suspicious
+                    riskScore += AnalyzeNameServers(rootWhoisResponse, flags);
                     riskScore += await AnalyzeSubdomainRisk(domain, rootDomain, flags);
                 }
                 else
                 {
                     flags.Add($"Root domain also does not exist: {rootDomain}");
                     flags.Add("HIGH RISK: Non-existent domain - likely phishing");
-                    riskScore += 85; // CHANGED: 80 → 85
+                    riskScore += 85;
                 }
             }
             catch (Exception ex)
@@ -181,7 +180,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             {
                 flags.Add("Subdomain does not resolve in DNS - suspicious");
                 flags.Add("Could be non-existent or malicious subdomain");
-                riskScore += 35; // CHANGED: 30 → 35
+                riskScore += 35;
                 return riskScore;
             }
 
@@ -194,7 +193,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             {
                 flags.Add($"HIGH RISK: Subdomain uses different IP ({ipComparison.SubdomainIP}) than root domain ({ipComparison.RootDomainIP})");
                 flags.Add("Possible compromised subdomain or phishing setup");
-                riskScore += 45; // CHANGED: 50 → 45
+                riskScore += 45;
             }
             else
             {
@@ -262,7 +261,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             if (highRiskPatterns.Any(pattern => subdomainPart.Contains(pattern)))
             {
                 flags.Add($"HIGH RISK: Suspicious subdomain pattern: {subdomainPart}");
-                riskScore += 40; // UNCHANGED
+                riskScore += 40;
             }
 
             return riskScore;
@@ -282,8 +281,6 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                     if (parts.Length >= 4)
                         return $"{parts[^3]}.{parts[^2]}.{parts[^1]}";
                 }
-
-                // Standard case: take last two parts
                 return $"{parts[^2]}.{parts[^1]}";
             }
 
@@ -497,42 +494,200 @@ namespace PhishingDetectionEngine.Core.ServiceModules
         {
             var riskScore = 0;
 
-            if (whoisResponse.NameServers?.Any() != true)
+            // First check if nameservers are properly parsed in the structured data
+            if (whoisResponse.NameServers != null && whoisResponse.NameServers.Any())
             {
-                flags.Add("No name server information available");
-                riskScore += 10;
+                var nameServers = whoisResponse.NameServers.Select(ns => ns.ToLower());
+                var nameServerRisk = CalculateNameServerRisk(nameServers);
+                riskScore += nameServerRisk;
+
+                if (nameServerRisk >= 12)
+                    flags.Add("Suspicious name server characteristics");
+                else if (nameServerRisk >= 8)
+                    flags.Add("Questionable name servers");
+
                 return riskScore;
             }
 
-            var nameServers = whoisResponse.NameServers.Select(ns => ns.ToLower());
-            var nameServerRisk = CalculateNameServerRisk(nameServers);
-            riskScore += nameServerRisk;
+            // If structured nameservers are empty, check the raw content
+            if (!string.IsNullOrEmpty(whoisResponse.Content))
+            {
+                var nameserversFromContent = ExtractNameserversFromContent(whoisResponse.Content);
+                if (nameserversFromContent.Any())
+                {
+                    var nameServerRisk = CalculateNameServerRisk(nameserversFromContent);
+                    riskScore += Math.Max(5, nameServerRisk / 2); // Reduced penalty since we found them
 
-            // PROPER THRESHOLDS FOR LOW-RISK CATEGORY (0-15 points)
-            if (nameServerRisk >= 12)
-                flags.Add("Suspicious name server characteristics"); // No "HIGH RISK" - it's Low-Risk!
-            else if (nameServerRisk >= 8)
-                flags.Add("Questionable name servers"); // No "MEDIUM RISK" - it's Low-Risk!
+                    if (nameServerRisk >= 12)
+                        flags.Add("Suspicious name server characteristics detected");
+                    else if (nameServerRisk >= 8)
+                        flags.Add("Questionable name servers detected");
 
+                    return riskScore;
+                }
+            }
+
+            // Only apply full penalty if truly no nameservers found anywhere
+            flags.Add("No name server information available");
+            riskScore += 10;
             return riskScore;
+        }
+
+        // Helper method to extract nameservers from raw WHOIS content
+        private List<string> ExtractNameserversFromContent(string content)
+        {
+            var nameservers = new List<string>();
+
+            try
+            {
+                var lines = content.Split('\n');
+                bool inNameserversSection = false;
+
+                foreach (var line in lines)
+                {
+                    var trimmedLine = line.Trim();
+
+                    // Look for the nameservers section
+                    if (trimmedLine.StartsWith("Nameservers", StringComparison.OrdinalIgnoreCase))
+                    {
+                        inNameserversSection = true;
+                        continue;
+                    }
+
+                    // If we're in the nameservers section, look for nameserver entries
+                    if (inNameserversSection)
+                    {
+                        // Skip empty lines or section endings
+                        if (string.IsNullOrEmpty(trimmedLine) ||
+                            trimmedLine.StartsWith("Registrant") ||
+                            trimmedLine.StartsWith("Admin Contact") ||
+                            trimmedLine.StartsWith("Technical Contact"))
+                        {
+                            inNameserversSection = false;
+                            continue;
+                        }
+
+                        // Extract nameserver (lines starting with whitespace in the nameservers section)
+                        if (trimmedLine.Length > 0 && !char.IsWhiteSpace(trimmedLine[0]))
+                        {
+                            // This might be a new section, exit nameservers
+                            inNameserversSection = false;
+                        }
+                        else
+                        {
+                            // This is likely a nameserver entry
+                            var nameserver = trimmedLine.Trim();
+                            if (!string.IsNullOrEmpty(nameserver) &&
+                                (nameserver.Contains(".ns.") || nameserver.EndsWith(".com") || nameserver.EndsWith(".net")))
+                            {
+                                nameservers.Add(nameserver.ToLower());
+                            }
+                        }
+                    }
+                }
+                if (!nameservers.Any())
+                {
+                    var nsMatches = System.Text.RegularExpressions.Regex.Matches(
+                        content,
+                        @"\b([a-zA-Z0-9\-]+\.ns\.cloudflare\.com|[a-zA-Z0-9\-]+\.ns\.[a-zA-Z0-9\-]+\.[a-zA-Z]+)\b");
+
+                    foreach (System.Text.RegularExpressions.Match match in nsMatches)
+                    {
+                        if (match.Success)
+                        {
+                            nameservers.Add(match.Value.ToLower());
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log parsing error but don't fail the whole analysis
+                Console.WriteLine($"Error extracting nameservers from content: {ex.Message}");
+            }
+
+            return nameservers.Distinct().ToList();
         }
 
         private int CalculateNameServerRisk(IEnumerable<string> nameServers)
         {
             int score = 0;
+            var nsList = nameServers.ToList();
 
-            // Free/cheap hosting providers
-            if (nameServers.Any(ns => ns.Contains("free") || ns.Contains("cheap"))) score += 6;
+            // High-risk hosting providers commonly used for phishing
+            var highRiskProviders = new[]
+            {
+                "freedns", "cheap", "bulletproof", "anonymous",
+                "privacy", "bitcoin", "crypto", "tor"
+            };
 
-            // New/uncommon providers
-            if (nameServers.Any(ns => ns.Length < 6)) score += 4;
+                    // Known legitimate providers (negative scoring)
+            var legitimateProviders = new[]
+            {
+                "cloudflare", "akamai", "amazonaws", "awsdns",
+                "google", "googledomains", "microsoft",
+                "rackspace", "godaddy", "namecheap"
+            };
 
-            // Multiple different providers
-            var uniqueProviders = nameServers.Select(ns => ns.Split('.')[^2]).Distinct().Count();
-            if (uniqueProviders > 3) score += 3;
+            foreach (var ns in nsList)
+            {
+                // Check for high-risk keywords
+                if (highRiskProviders.Any(risk => ns.Contains(risk)))
+                {
+                    score += 8; // High risk for suspicious providers
+                    continue;
+                }
 
-            // Cap at Low-Risk maximum
-            return Math.Min(score, 15);
+                // Check for legitimate providers (reduce risk)
+                if (legitimateProviders.Any(legit => ns.Contains(legit)))
+                {
+                    score -= 2; // Positive indicator
+                    continue;
+                }
+
+                // Suspicious: IP addresses as nameservers
+                if (System.Net.IPAddress.TryParse(ns.Split('.')[0], out _))
+                {
+                    score += 6;
+                }
+
+                // Suspicious: Very new TLDs in nameservers
+                if (ns.EndsWith(".xyz") || ns.EndsWith(".top") || ns.EndsWith(".club") ||
+                    ns.EndsWith(".loan") || ns.EndsWith(".win"))
+                {
+                    score += 3;
+                }
+            }
+
+            // Multiple different providers can indicate instability
+            var uniqueProviders = nsList.Select(ns =>
+            {
+                var parts = ns.Split('.');
+                return parts.Length >= 2 ? parts[^2] : ns;
+            }).Distinct().Count();
+
+            if (uniqueProviders > 3)
+            {
+                score += 4; // Too many different providers
+            }
+            else if (uniqueProviders == 1)
+            {
+                score -= 1; // Good: Consistent provider
+            }
+
+            // All nameservers from same provider might be risky too
+            if (uniqueProviders == 1 && nsList.Count >= 2)
+            {
+                // Check if it's a known high-risk single provider
+                var provider = nsList[0].Split('.')[^2];
+                if (highRiskProviders.Any(risk => provider.Contains(risk)))
+                {
+                    score += 5;
+                }
+            }
+
+            // Cap the score
+            return Math.Max(0, Math.Min(score, 20));
         }
 
         // Check if contact information is hidden or generic
@@ -546,13 +701,13 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             if (IsGenericContactEmail(registrantEmail) || IsGenericContactEmail(adminEmail))
             {
                 flags.Add("MEDIUM RISK: Generic or privacy-protected contact email");
-                riskScore += 20; // UNCHANGED
+                riskScore += 20;
             }
 
             if (string.IsNullOrEmpty(whoisResponse.Registrant?.Organization))
             {
                 flags.Add("No organization information provided");
-                riskScore += 15; // UNCHANGED
+                riskScore += 15;
             }
 
             return riskScore;
