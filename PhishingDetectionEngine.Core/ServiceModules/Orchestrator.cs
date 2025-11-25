@@ -12,20 +12,24 @@ namespace PhishingDetectionEngine.Core
 {
     public class PhishingOrchestrator
     {
-        private readonly IUrlService _urlService;
         private readonly HttpClient _httpClient;
+        private readonly IUrlService _urlService;
+        private readonly IContentService _contentService;
 
-        public PhishingOrchestrator(HttpClient httpClient, IUrlService urlService)
+        public PhishingOrchestrator(HttpClient httpClient, IUrlService urlService, IContentService contentService)
         {
             _httpClient = httpClient;
             _urlService = urlService;
+            _contentService = contentService;
         }
 
         public async Task<DetectionResult> AnalyzeEmailAsync(ParsedEmail parsedEmail)
         {           
             var detectionTasks = new List<Task<DetectionResult>>
             {
-                _urlService.PerformLookup(parsedEmail)
+                _urlService.PerformLookup(parsedEmail),
+                
+                _contentService.AnalyzeContent(parsedEmail)
             };
 
             var detectionResults = await Task.WhenAll(detectionTasks);

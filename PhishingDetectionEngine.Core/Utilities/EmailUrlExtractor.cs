@@ -15,6 +15,7 @@ namespace PhishingDetectionEngine.Core.Utilities
         );
         public static List<string> ExtractUrls(ParsedEmail email)
         {
+            Console.WriteLine("body in URL service" + email?.TextBody);
             // Return empty list if email is null
             if (email == null) return new List<string>();
 
@@ -23,6 +24,7 @@ namespace PhishingDetectionEngine.Core.Utilities
             // Extract URLs from all relevant email content fields
             ExtractFromText(email.Subject, urls);
             ExtractFromText(email.TextBody, urls);
+            Console.WriteLine("body in UEXTRACTOR service:" + email.HtmlBody);
             ExtractFromText(email.HtmlBody, urls);
 
             // Process URLs: normalize, filter out empty ones, and remove duplicates
