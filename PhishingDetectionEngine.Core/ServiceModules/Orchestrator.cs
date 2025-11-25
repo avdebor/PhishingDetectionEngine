@@ -28,6 +28,7 @@ namespace PhishingDetectionEngine.Core
             var detectionTasks = new List<Task<DetectionResult>>
             {
                 _urlService.PerformLookup(parsedEmail),
+                
                 _contentService.AnalyzeContent(parsedEmail)
             };
 

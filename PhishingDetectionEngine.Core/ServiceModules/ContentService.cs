@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using PhishingDetectionEngine.Core.Models;
 using PhishingDetectionEngine.Core.Interfaces;
+using PhishingDetectionEngine.Core.Utilities;
 
 namespace PhishingDetectionEngine.Core.ServiceModules
 {
@@ -31,7 +32,8 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 "betaling", "transactie", "overschrijving", "limiet",
                 "premie", "korting", "aanbieding", "winnaar",
                 "prijs", "lottery", "geluksvogel", "gratis",
-                "urgent", "belangrijk", "aandacht", "waarschuwing", "WhatsApp-nummer"
+                "urgent", "belangrijk", "aandacht", "waarschuwing",
+                "WhatsApp-nummer", "WhatsApp"
             };
 
             // English suspicious words
@@ -100,8 +102,9 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                     detectionResult.Flags.Add("No email content to analyze for suspicious words");
                     return detectionResult;
                 }
-
-                var textToAnalyze = $"{email.Subject} {email.HtmlBody}";
+                
+                string emailBody = TextFetcherFromHTMLContent.GetPlainTextFromHtmlContent(email.HtmlBody);
+                var textToAnalyze = $"{email.Subject} {emailBody}";
                 Console.WriteLine("email text body : " + email.TextBody);
                 Console.WriteLine(String.IsNullOrEmpty(email.TextBody));      
                 var foundWords = FindSuspiciousWords(textToAnalyze);
@@ -186,7 +189,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             bool hasUrgency = ContainsUrgentLanguage(text);
 
             // If ANY suspicious word is found, start at 60
-            int score = 60;
+            int score = 30;
 
             // Count occurrences or weight based on risk level
             int repetitionBonus = foundWords.Count * 10; // each word adds +10
@@ -195,10 +198,10 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
             // If urgency + suspicious content -> maximum risk
             if (hasUrgency)
-                return 100;
+                return score += 50;
 
             // Cap at 95 to leave urgency as the only way to hit 100
-            return Math.Min(score, 95);
+            return Math.Min(score, 100);
         }
 
 
@@ -207,7 +210,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             var urgentPatterns = new[]
             {
                 "immediately", "urgent", "right now", "act now",
-                "dringend", "onmiddellijk", "nu handelen"
+                "dringend", "onmiddellijk", "nu handelen", "spoed"
             };
 
             return urgentPatterns.Any(pattern => 
