@@ -39,6 +39,8 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
             try
             {
+                Console.WriteLine("body in URL service" + email?.TextBody);
+
                 // Extract URLs + filter known safe URLs
                 var urlsToCheck = EmailUrlExtractor.ExtractUrls(email)
                     .Where(u => !string.IsNullOrWhiteSpace(u) && 

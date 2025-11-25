@@ -23,6 +23,7 @@ builder.Services.Configure<FormOptions>(options =>
 builder.Services.AddControllers();
 builder.Services.AddScoped<PhishingOrchestrator>();
 builder.Services.AddScoped<EmailParserService>();
+builder.Services.AddScoped<IContentService, AnalyzeEmailContent>();
 
 
 // Swagger / OpenAPI
