@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -13,22 +13,24 @@ namespace PhishingDetectionEngine.Core
     public class PhishingOrchestrator
     {
         private readonly HttpClient _httpClient;
+        private readonly IWhoIsService _whoIsService;
         private readonly IUrlService _urlService;
-        private readonly IContentService _contentService;
+        private readonly IContentService _contentService
 
-        public PhishingOrchestrator(HttpClient httpClient, IUrlService urlService, IContentService contentService)
+        public PhishingOrchestrator(HttpClient httpClient, IUrlService urlService, IWhoIsService whoIsService, IContentService      contentService)
         {
             _httpClient = httpClient;
             _urlService = urlService;
+            _whoIsService = whoIsService;
             _contentService = contentService;
         }
 
         public async Task<DetectionResult> AnalyzeEmailAsync(ParsedEmail parsedEmail)
-        {           
+        {
             var detectionTasks = new List<Task<DetectionResult>>
             {
                 _urlService.PerformLookup(parsedEmail),
-                
+                _whoIsService.AnalyzeDomainAsync(parsedEmail),
                 _contentService.AnalyzeContent(parsedEmail)
             };
 
