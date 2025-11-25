@@ -118,7 +118,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             {
                 detectionResult.Flags.Add($"Error during suspicious words analysis: {ex.Message}");
             }
-
+            detectionResult.Percentage = Math.Min(detectionResult.Percentage, 100);
             return detectionResult;
         }
 
@@ -201,7 +201,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 return score += 50;
 
             // Cap at 95 to leave urgency as the only way to hit 100
-            return Math.Min(score, 100);
+            return Math.Min(score, 95);
         }
 
 
