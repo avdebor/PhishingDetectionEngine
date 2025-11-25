@@ -15,7 +15,7 @@ namespace PhishingDetectionEngine.Core
         private readonly HttpClient _httpClient;
         private readonly IWhoIsService _whoIsService;
         private readonly IUrlService _urlService;
-        private readonly IContentService _contentService
+        private readonly IContentService _contentService;
 
         public PhishingOrchestrator(HttpClient httpClient, IUrlService urlService, IWhoIsService whoIsService, IContentService      contentService)
         {
