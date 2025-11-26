@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -18,16 +18,16 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
         public AnalyzeEmailContent()
         {
-
+            // highly suspicious words
             _highlySuspiciousWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                "mobiele nummer", "WhatsApp-nummer", "WhatsApp", "mobile number"
+                "mobiele nummer", "WhatsApp-nummer", "WhatsApp", "mobile number", "telefoonnummer"
             };
 
             // Dutch suspicious words
             _suspiciousWordsDutch = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                 "telefoonnummer", "bankgegevens", "inloggegevens",
+                "bankgegevens", "inloggegevens",
                 "wachtwoord", "beveiligingscode", "verificatiecode", "sms code",
                 "authenticatie", "account", "betaalgegevens", "creditcard",
                 "pin code", "identiteitsbewijs", "bsn", "bsn nummer", "sofi nummer",
@@ -35,7 +35,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 "bevestiging", "update", "onderhoud", "probleem",
                 "verdacht", "ongebruikelijk", "activiteit", "inbreuk",
                 "beveiliging", "veiligheid", "opschorten", "blokkeren",
-                "verlopen", "verlopen", "aankoop", "factuur",
+                "verlopen", "aankoop", "factuur",
                 "betaling", "transactie", "overschrijving", "limiet",
                 "premie", "korting", "aanbieding", "winnaar",
                 "prijs", "lottery", "geluksvogel", "gratis",
@@ -49,7 +49,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 "account", "security", "verify", "authentication",
                 "confirmation", "update", "maintenance", "problem",
                 "suspicious", "unusual", "activity", "breach",
-                "security", "safety", "suspend", "block",
+                "safety", "suspend", "block",
                 "expire", "expired", "purchase", "invoice",
                 "payment", "transaction", "transfer", "limit",
                 "premium", "discount", "offer", "winner",
@@ -60,22 +60,18 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 "banking", "financial", "personal information", "social security",
                 "credit card", "debit card", "paypal", "bitcoin",
                 "crypto", "password reset", "account recovery", "unlock account",
-                "activate", "accept", "AI", "awards", "award", "security",
-                "verification", "authentication", "validation",
-                "confirm", "verify", "authenticate", "validate",
-                "password", "pin", "code", "token",
-                "2fa", "two factor", "multi factor", "biometric",
-                "encryption", "secure", "protected", "safety", "securing",
+                "activate", "accept", "awards", "award",
                 "start"
             };
 
-            // Urgent action words
+            // Urgent action words 
             _urgentActionWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
                 "immediately", "urgent", "now", "right away",
                 "instant", "quick", "fast", "hurry",
                 "deadline", "limited time", "last chance", "final warning",
-                "action required", "immediate action", "respond now", "click immediately"
+                "action required", "immediate action", "respond now", "click immediately",
+                "dringend", "onmiddellijk", "nu handelen", "spoed"
             };
 
             // Security-related terms
@@ -85,14 +81,13 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 "confirm", "verify", "authenticate", "validate",
                 "password", "pin", "code", "token",
                 "2fa", "two factor", "multi factor", "biometric",
-                "encryption", "secure", "protected", "safety", "securing"
+                "encryption", "secure", "protected", "safety", "securing",
+                "wachtwoord", "inlog", "login"
             };
         }
 
         public async Task<DetectionResult> AnalyzeContent(ParsedEmail email)
         {
-            Console.WriteLine(email.TextBody);
-
             var detectionResult = new DetectionResult
             {
                 EmailSubject = email?.Subject ?? "No subject",
@@ -103,148 +98,50 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
             try
             {
-                if (email == null || (string.IsNullOrEmpty(email.TextBody) && string.IsNullOrEmpty(email.Subject)))
+                if (email == null || (string.IsNullOrWhiteSpace(email.TextBody) && string.IsNullOrWhiteSpace(email.Subject)))
                 {
-                    detectionResult.Flags.Add("No email content to analyze for suspicious words");
+                    detectionResult.Flags.Add("No email content to analyze.");
                     return detectionResult;
                 }
-                
-                string emailBody = TextFetcherFromHTMLContent.GetPlainTextFromHtmlContent(email.HtmlBody);
-                var textToAnalyze = $"{email.Subject} {emailBody}";
-                Console.WriteLine("email text body : " + email.TextBody);
-                Console.WriteLine(String.IsNullOrEmpty(email.TextBody));      
-                var foundWords = FindSuspiciousWords(textToAnalyze);
-                var riskScore = CalculateRiskScore(foundWords, textToAnalyze);
-                var hasPhoneNumber = ContainsPhoneNumber(emailBody);
-                var hasHighlySusWords = ContainsHighlySuspiciousWords(emailBody);
-                
-                AddDetectionFlags(detectionResult, foundWords, riskScore, hasPhoneNumber, hasHighlySusWords);
 
-                detectionResult.Percentage = riskScore;
+                string htmlPlainText = TextFetcherFromHTMLContent.GetPlainTextFromHtmlContent(email.HtmlBody);
+                string textToAnalyze = string.Join(" ",
+                    new[] { email.Subject, htmlPlainText, email.TextBody }
+                    .Where(s => !string.IsNullOrWhiteSpace(s)));
+
+                textToAnalyze = textToAnalyze ?? string.Empty;
+
+
+                bool hasPhoneNumber = ContainsPhoneNumber(textToAnalyze);
+                var highlySuspiciousMatches = FindMatches(textToAnalyze, _highlySuspiciousWords);
+                var urgentMatches = FindMatches(textToAnalyze, _urgentActionWords);
+                var securityMatches = FindMatches(textToAnalyze, _securityTerms);
+                var suspiciousDutchMatches = FindMatches(textToAnalyze, _suspiciousWordsDutch);
+                var suspiciousEnglishMatches = FindMatches(textToAnalyze, _suspiciousWordsEnglish);
+
+                //add the flagss and calculate score
+
+                AddFlags(detectionResult,hasPhoneNumber,highlySuspiciousMatches,urgentMatches,securityMatches,suspiciousDutchMatches,suspiciousEnglishMatches);
+                detectionResult.Percentage = CalculateScore(hasPhoneNumber,highlySuspiciousMatches,urgentMatches,securityMatches,suspiciousDutchMatches,suspiciousEnglishMatches);
             }
             catch (Exception ex)
             {
-                detectionResult.Flags.Add($"Error during suspicious words analysis: {ex.Message}");
+                detectionResult.Flags.Add($"Error during suspicious content analysis: {ex.Message}");
             }
-            detectionResult.Percentage = Math.Min(detectionResult.Percentage, 100);
+
             return detectionResult;
         }
 
-        private Dictionary<string, int> FindSuspiciousWords(string text)
-        {
-            var foundWords = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-
-            string[] words = text.Split(' ');
-            foreach (var word in words)
-            {
-                Console.WriteLine(word);
-            }
-
-            Console.WriteLine("------Dutch words------");
-            foreach (var word in _suspiciousWordsDutch)
-            {
-                // Console.WriteLine(word);
-                if (text.Contains(word, StringComparison.OrdinalIgnoreCase))
-                {
-                    foundWords[word] = GetWordRiskLevel(word);
-                }
-            }
-
-            Console.WriteLine("------English words------");
-            foreach (var word in _suspiciousWordsEnglish)
-            {
-                // Console.WriteLine(word);
-                if (text.Contains(word, StringComparison.OrdinalIgnoreCase))
-                {
-                    foundWords[word] = GetWordRiskLevel(word);
-                }
-            }
-
-
-            return foundWords;
-        }
-
-        private int GetWordRiskLevel(string word)
-        {
-            // High risk words
-            if (_urgentActionWords.Contains(word) || 
-                word.Contains("password") || 
-                word.Contains("wachtwoord") ||
-                word.Contains("bank") ||
-                word.Contains("creditcard") ||
-                word.Contains("bsn"))
-            {
-                return 3; // High risk
-            }
-
-            // Medium risk words
-            if (_securityTerms.Contains(word) ||
-                word.Contains("verificatie") ||
-                word.Contains("verification") ||
-                word.Contains("login") ||
-                word.Contains("inlog"))
-            {
-                return 2;
-            }
-
-            return 1;
-        }
-
-        private int CalculateRiskScore(Dictionary<string, int> foundWords, string text)
-        {
-
-            bool hasPhoneNumber = ContainsPhoneNumber(text);
-
-            if (!foundWords.Any() && !hasPhoneNumber)
-                return 0;
-
-            bool hasUrgency = ContainsUrgentLanguage(text);
-            bool hasHighlySusWords = ContainsHighlySuspiciousWords(text);
-
-            // If ANY suspicious word is found, start at 20
-            int score = 20;
-
-            // Count occurrences or weight based on risk level
-            int repetitionBonus = foundWords.Count * 5; // each word adds +10
-
-            score += repetitionBonus;
-
-            // If urgency + suspicious content -> maximum risk
-            if (hasUrgency || hasHighlySusWords)
-                return score += 40;
-
-            if (hasPhoneNumber)
-            {
-                return 100;
-            }
-
-            // Cap at 95 to leave urgency as the only way to hit 100
-            return Math.Min(score, 100);
-        }
-
-
-        private bool ContainsUrgentLanguage(string text)
-        {
-            var urgentPatterns = new[]
-            {
-                "immediately", "urgent", "right now", "act now",
-                "dringend", "onmiddellijk", "nu handelen", "spoed"
-            };
-
-            return urgentPatterns.Any(pattern => 
-                text.Contains(pattern, StringComparison.OrdinalIgnoreCase));
-        }
-
-        private bool ContainsHighlySuspiciousWords(string text)
+        private static List<string> FindMatches(string text, HashSet<string> phrases)
         {
             if (string.IsNullOrWhiteSpace(text))
-                return false;
+                return new List<string>();
 
-            // Check if any of the "highly suspicious" phrases appear in the text
-            return _highlySuspiciousWords.Any(word =>
-                text.Contains(word, StringComparison.OrdinalIgnoreCase));
+            return phrases
+                .Where(p => text.Contains(p, StringComparison.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
-
 
         private bool ContainsPhoneNumber(string text)
         {
@@ -258,57 +155,112 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 @"\b\d{10,}\b"
             };
 
-            return phonePatterns.Any(pattern =>
-                System.Text.RegularExpressions.Regex.IsMatch(text, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase));
+            return phonePatterns.Any(pattern =>System.Text.RegularExpressions.Regex.IsMatch(text,pattern,System.Text.RegularExpressions.RegexOptions.IgnoreCase));
         }
 
-
-        private void AddDetectionFlags(DetectionResult result, Dictionary<string, int> foundWords, int riskScore, bool hasPhoneNumber, bool hasHighlySusWords)
+        private void AddFlags(DetectionResult result, bool hasPhoneNumber, List<string> highlySuspicious, List<string> urgent, List<string> security, List<string> suspiciousDutch, List<string> suspiciousEnglish)
         {
-            
-            if (!foundWords.Any() && !hasPhoneNumber)
+            bool hasAnySuspicious =
+                hasPhoneNumber ||
+                highlySuspicious.Any() ||
+                urgent.Any() ||
+                security.Any() ||
+                suspiciousDutch.Any() ||
+                suspiciousEnglish.Any();
+
+            if (!hasAnySuspicious)
             {
-                result.Flags.Add("No suspicious words detected");
+                result.Flags.Add("No suspicious words, phrases or patterns detected.");
                 return;
             }
 
-            if (hasHighlySusWords)
-            {
-                result.Flags.Add("HIGHLY SUSPICIOUS WORDS FOUND (print the word later) :3");
-            }
-
-
             if (hasPhoneNumber)
             {
-                result.Flags.Add("HIGH RISK: Phone Number Found");
+                result.Flags.Add("HIGH RISK: Phone number detected in the email content.");
             }
 
-            result.Flags.Add($"Found {foundWords.Count} suspicious word(s)");
-
-            var highRiskWords = foundWords.Where(w => w.Value >= 2).ToList();
-            if (highRiskWords.Any())
+            if (highlySuspicious.Any())
             {
-                result.Flags.Add($"High-risk words detected: {string.Join(", ", highRiskWords.Select(w => w.Key))}");
+                result.Flags.Add("Highly suspicious contact-related wording detected: " +
+                                 string.Join(", ", highlySuspicious));
             }
 
-            var mediumRiskWords = foundWords.Where(w => w.Value == 1).ToList();
-            if (mediumRiskWords.Any())
+            if (urgent.Any())
             {
-                result.Flags.Add($"Suspicious words detected: {string.Join(", ", mediumRiskWords.Select(w => w.Key))}");
+                result.Flags.Add("Urgent / pressure language detected: " +
+                                 string.Join(", ", urgent));
             }
 
-            if (riskScore >= 70)
+            if (security.Any())
             {
-                result.Flags.Add("HIGH RISK: Multiple high-risk suspicious words detected");
+                result.Flags.Add("Security / access related terms detected: " +
+                                 string.Join(", ", security));
             }
-            else if (riskScore >= 40)
+
+            if (suspiciousDutch.Any())
             {
-                result.Flags.Add("MEDIUM RISK: Suspicious words patterns detected");
+                result.Flags.Add("Suspicious Dutch terms detected: " +
+                                 string.Join(", ", suspiciousDutch));
             }
-            else if (riskScore > 0)
+
+            if (suspiciousEnglish.Any())
             {
-                result.Flags.Add("LOW RISK: Minor suspicious content detected");
+                result.Flags.Add("Suspicious English terms detected: " +
+                                 string.Join(", ", suspiciousEnglish));
             }
+        }
+
+        private int CalculateScore(bool hasPhoneNumber, List<string> highlySuspicious, List<string> urgent, List<string> security, List<string> suspiciousDutch, List<string> suspiciousEnglish){
+            //phone number = always 100
+            if (hasPhoneNumber)
+                return 100;
+
+            //making new hashsets to ignore the duplicates
+            var highSet = new HashSet<string>(highlySuspicious, StringComparer.OrdinalIgnoreCase);
+            var urgentSet = new HashSet<string>(urgent, StringComparer.OrdinalIgnoreCase);
+            var securitySet = new HashSet<string>(security, StringComparer.OrdinalIgnoreCase);
+            var dutchSet = new HashSet<string>(suspiciousDutch, StringComparer.OrdinalIgnoreCase);
+            var englishSet = new HashSet<string>(suspiciousEnglish, StringComparer.OrdinalIgnoreCase);
+            //this is for both english and dutch normally suspicous words
+            var normalSet = new HashSet<string>(securitySet, StringComparer.OrdinalIgnoreCase);
+
+
+            normalSet.UnionWith(dutchSet);
+            normalSet.UnionWith(englishSet);
+
+            normalSet.ExceptWith(highSet);
+            normalSet.ExceptWith(urgentSet);
+
+            int normalCount = normalSet.Count;
+            int highCount = highSet.Count;
+            int urgentCount = urgentSet.Count;
+
+            bool anySuspicious = (normalCount + highCount + urgentCount) > 0;
+            if (!anySuspicious)
+                return 0;
+
+            int score = 0;
+
+            // Any suspicious words = start at 20
+            score += 20;
+
+            // Urgency or highly suspicious word +30
+            if (urgentCount > 0 || highCount > 0)
+                score += 30;
+
+            // every normaly suspicious word after the first one +5
+            int extraNormal = Math.Max(0, normalCount - 1);
+            score += extraNormal * 5;
+
+            //every highly suspicious word after the first one +10
+            if (highCount > 1)
+            {
+                int extraHigh = highCount - 1;
+                score += extraHigh * 10;
+            }
+
+            //cap at 100
+            return Math.Min(score, 100);
         }
     }
 }
