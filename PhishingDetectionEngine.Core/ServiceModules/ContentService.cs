@@ -14,13 +14,20 @@ namespace PhishingDetectionEngine.Core.ServiceModules
         private readonly HashSet<string> _suspiciousWordsEnglish;
         private readonly HashSet<string> _urgentActionWords;
         private readonly HashSet<string> _securityTerms;
+        private readonly HashSet<string> _highlySuspiciousWords;
 
         public AnalyzeEmailContent()
         {
+
+            _highlySuspiciousWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "mobiele nummer", "WhatsApp-nummer", "WhatsApp", "mobile number"
+            };
+
             // Dutch suspicious words
             _suspiciousWordsDutch = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                "mobiele nummer", "telefoonnummer", "bankgegevens", "inloggegevens",
+                 "telefoonnummer", "bankgegevens", "inloggegevens",
                 "wachtwoord", "beveiligingscode", "verificatiecode", "sms code",
                 "authenticatie", "account", "betaalgegevens", "creditcard",
                 "pin code", "identiteitsbewijs", "bsn", "bsn nummer", "sofi nummer",
@@ -32,8 +39,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 "betaling", "transactie", "overschrijving", "limiet",
                 "premie", "korting", "aanbieding", "winnaar",
                 "prijs", "lottery", "geluksvogel", "gratis",
-                "urgent", "belangrijk", "aandacht", "waarschuwing",
-                "WhatsApp-nummer", "WhatsApp"
+                "urgent", "belangrijk", "aandacht", "waarschuwing"
             };
 
             // English suspicious words
@@ -110,8 +116,9 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 var foundWords = FindSuspiciousWords(textToAnalyze);
                 var riskScore = CalculateRiskScore(foundWords, textToAnalyze);
                 var hasPhoneNumber = ContainsPhoneNumber(emailBody);
+                var hasHighlySusWords = ContainsHighlySuspiciousWords(emailBody);
                 
-                AddDetectionFlags(detectionResult, foundWords, riskScore, hasPhoneNumber);
+                AddDetectionFlags(detectionResult, foundWords, riskScore, hasPhoneNumber, hasHighlySusWords);
 
                 detectionResult.Percentage = riskScore;
             }
@@ -153,6 +160,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 }
             }
 
+
             return foundWords;
         }
 
@@ -191,6 +199,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 return 0;
 
             bool hasUrgency = ContainsUrgentLanguage(text);
+            bool hasHighlySusWords = ContainsHighlySuspiciousWords(text);
 
             // If ANY suspicious word is found, start at 20
             int score = 20;
@@ -201,7 +210,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             score += repetitionBonus;
 
             // If urgency + suspicious content -> maximum risk
-            if (hasUrgency)
+            if (hasUrgency || hasHighlySusWords)
                 return score += 40;
 
             if (hasPhoneNumber)
@@ -226,6 +235,17 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 text.Contains(pattern, StringComparison.OrdinalIgnoreCase));
         }
 
+        private bool ContainsHighlySuspiciousWords(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+
+            // Check if any of the "highly suspicious" phrases appear in the text
+            return _highlySuspiciousWords.Any(word =>
+                text.Contains(word, StringComparison.OrdinalIgnoreCase));
+        }
+
+
         private bool ContainsPhoneNumber(string text)
         {
             if (string.IsNullOrWhiteSpace(text))
@@ -243,7 +263,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
         }
 
 
-        private void AddDetectionFlags(DetectionResult result, Dictionary<string, int> foundWords, int riskScore, bool hasPhoneNumber)
+        private void AddDetectionFlags(DetectionResult result, Dictionary<string, int> foundWords, int riskScore, bool hasPhoneNumber, bool hasHighlySusWords)
         {
             
             if (!foundWords.Any() && !hasPhoneNumber)
@@ -251,6 +271,12 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 result.Flags.Add("No suspicious words detected");
                 return;
             }
+
+            if (hasHighlySusWords)
+            {
+                result.Flags.Add("HIGHLY SUSPICIOUS WORDS FOUND (print the word later) :3");
+            }
+
 
             if (hasPhoneNumber)
             {
