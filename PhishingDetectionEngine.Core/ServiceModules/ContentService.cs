@@ -109,8 +109,9 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 Console.WriteLine(String.IsNullOrEmpty(email.TextBody));      
                 var foundWords = FindSuspiciousWords(textToAnalyze);
                 var riskScore = CalculateRiskScore(foundWords, textToAnalyze);
+                var hasPhoneNumber = ContainsPhoneNumber(emailBody);
                 
-                AddDetectionFlags(detectionResult, foundWords, riskScore);
+                AddDetectionFlags(detectionResult, foundWords, riskScore, hasPhoneNumber);
 
                 detectionResult.Percentage = riskScore;
             }
@@ -183,25 +184,33 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
         private int CalculateRiskScore(Dictionary<string, int> foundWords, string text)
         {
-            if (!foundWords.Any())
+
+            bool hasPhoneNumber = ContainsPhoneNumber(text);
+
+            if (!foundWords.Any() && !hasPhoneNumber)
                 return 0;
 
             bool hasUrgency = ContainsUrgentLanguage(text);
 
-            // If ANY suspicious word is found, start at 60
-            int score = 30;
+            // If ANY suspicious word is found, start at 20
+            int score = 20;
 
             // Count occurrences or weight based on risk level
-            int repetitionBonus = foundWords.Count * 10; // each word adds +10
+            int repetitionBonus = foundWords.Count * 5; // each word adds +10
 
             score += repetitionBonus;
 
             // If urgency + suspicious content -> maximum risk
             if (hasUrgency)
-                return score += 50;
+                return score += 40;
+
+            if (hasPhoneNumber)
+            {
+                return 100;
+            }
 
             // Cap at 95 to leave urgency as the only way to hit 100
-            return Math.Min(score, 95);
+            return Math.Min(score, 100);
         }
 
 
@@ -217,12 +226,35 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 text.Contains(pattern, StringComparison.OrdinalIgnoreCase));
         }
 
-        private void AddDetectionFlags(DetectionResult result, Dictionary<string, int> foundWords, int riskScore)
+        private bool ContainsPhoneNumber(string text)
         {
-            if (!foundWords.Any())
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+
+            var phonePatterns = new[]
+            {
+                @"(?:\+|00)\d{2}\s*(?:\(\s*0\s*\))?\s*[\d\-\s]{6,}",
+                @"\b0\d{1,3}[\s\-]?\d{6,8}\b",
+                @"\b\d{10,}\b"
+            };
+
+            return phonePatterns.Any(pattern =>
+                System.Text.RegularExpressions.Regex.IsMatch(text, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase));
+        }
+
+
+        private void AddDetectionFlags(DetectionResult result, Dictionary<string, int> foundWords, int riskScore, bool hasPhoneNumber)
+        {
+            
+            if (!foundWords.Any() && !hasPhoneNumber)
             {
                 result.Flags.Add("No suspicious words detected");
                 return;
+            }
+
+            if (hasPhoneNumber)
+            {
+                result.Flags.Add("HIGH RISK: Phone Number Found");
             }
 
             result.Flags.Add($"Found {foundWords.Count} suspicious word(s)");
