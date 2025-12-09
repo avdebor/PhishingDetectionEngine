@@ -10,10 +10,10 @@ using Whois;
 
 namespace PhishingDetectionEngine.Core.ServiceModules
 {
-    public class WhoIsService : IModuleInterface
+    public class WhoIsModuleService : IModuleInterface
     {
 
-        public WhoIsService(){}
+        public WhoIsModuleService(){}
 
 
         public async Task<DetectionResult> AnalyzeEmailAsync(ParsedEmail eml)
