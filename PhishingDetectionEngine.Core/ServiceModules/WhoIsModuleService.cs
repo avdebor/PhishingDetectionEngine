@@ -10,16 +10,13 @@ using Whois;
 
 namespace PhishingDetectionEngine.Core.ServiceModules
 {
-    public class WhoIsService : IWhoIsService
+    public class WhoIsModuleService : IModuleInterface
     {
-        private readonly WhoisLookup _whoisLookup;
 
-        public WhoIsService()
-        {
-            _whoisLookup = new WhoisLookup();
-        }
+        public WhoIsModuleService(){}
 
-        public async Task<DetectionResult> AnalyzeDomainAsync(ParsedEmail eml)
+
+        public async Task<DetectionResult> AnalyzeEmailAsync(ParsedEmail eml)
         {
             if (eml == null)
             {
@@ -43,7 +40,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             try
             {
                 // Lookup domain in WHOIS database
-                var whoisResponse = await _whoisLookup.LookupAsync(domain);
+                var whoisResponse = await LookupDomainAsync(domain);
                 return await AnalyzeWhoIsResponse(whoisResponse, domain, eml.Subject);
             }
             catch (Exception ex)
@@ -57,6 +54,14 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 };
             }
         }
+
+        private async Task<WhoisResponse?> LookupDomainAsync(string domain)
+        {
+            using var whoisLookup = new WhoisLookup();
+            return await whoisLookup.LookupAsync(domain);
+        }
+
+
 
         private async Task<DetectionResult> AnalyzeWhoIsResponse(WhoisResponse whoisResponse, string domain, string subject)
         {
@@ -136,7 +141,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
             try
             {
-                var rootWhoisResponse = await _whoisLookup.LookupAsync(rootDomain);
+                var rootWhoisResponse = await LookupDomainAsync(rootDomain);
 
                 if (rootWhoisResponse?.Status == WhoisStatus.Found)
                 {

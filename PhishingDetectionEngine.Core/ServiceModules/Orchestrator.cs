@@ -1,72 +1,49 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using PhishingDetectionEngine.Core.Interfaces;
 using PhishingDetectionEngine.Core.Models;
-using PhishingDetectionEngine.Core.ServiceModules;
 
 namespace PhishingDetectionEngine.Core
 {
     public class PhishingOrchestrator
     {
         private readonly HttpClient _httpClient;
-        private readonly IWhoIsService _whoIsService;
-        private readonly IUrlService _urlService;
-        private readonly IContentService _contentService;
+        private readonly List<IModuleInterface> _modules;
 
-        public PhishingOrchestrator(HttpClient httpClient, IUrlService urlService, IWhoIsService whoIsService, IContentService      contentService)
+        public PhishingOrchestrator(HttpClient httpClient, IEnumerable<IModuleInterface> modules)
         {
             _httpClient = httpClient;
-            _urlService = urlService;
-            _whoIsService = whoIsService;
-            _contentService = contentService;
+            _modules = modules.ToList();
         }
 
         public async Task<DetectionResult> AnalyzeEmailAsync(ParsedEmail parsedEmail)
         {
-            var detectionTasks = new List<Task<DetectionResult>>
-            {
-                _urlService.PerformLookup(parsedEmail),
-                _whoIsService.AnalyzeDomainAsync(parsedEmail),
-                _contentService.AnalyzeContent(parsedEmail)
-            };
+            var detectionTasks = _modules
+                .Select(m => m.AnalyzeEmailAsync(parsedEmail))
+                .ToList();
 
             var detectionResults = await Task.WhenAll(detectionTasks);
 
-            List<int> scores = new List<int>();
-
-            foreach (var result in detectionResults)
-            {
-                scores.Add(result.Percentage);
-            }
-
-            List<string> combinedFlags = new List<string>();
-
-            foreach (var result in detectionResults)
-            {
-                foreach (var flag in result.Flags)
-                {
-                    if (!combinedFlags.Contains(flag))
-                    {
-                        combinedFlags.Add(flag);
-                    }
-                }
-            }
+            var scores = detectionResults
+                .Select(r => r.Percentage)
+                .ToList();
+            var combinedFlags = detectionResults
+                .SelectMany(r => r.Flags)
+                .Distinct()
+                .ToList();
 
             int totalScore = CalculateOverallScore(scores);
 
-            DetectionResult finalDetectionResult = new DetectionResult
+            return new DetectionResult
             {
                 EmailSubject = parsedEmail.Subject,
                 Percentage = totalScore,
                 Flags = combinedFlags,
                 DateOfScan = DateTime.Now
             };
-
-            return finalDetectionResult;
         }
 
         private int CalculateOverallScore(List<int> scores)

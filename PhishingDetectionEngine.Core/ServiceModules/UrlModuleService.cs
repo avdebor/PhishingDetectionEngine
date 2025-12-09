@@ -10,7 +10,7 @@ using PhishingDetectionEngine.Core.Utilities;
 
 namespace PhishingDetectionEngine.Core.ServiceModules
 {
-    public class UrlService : IUrlService
+    public class UrlModuleService : IModuleInterface
     {
         private readonly HttpClient _httpClient;
         private const string PhishStatsApiUrl = "https://api.phishstats.info/api/phishing";
@@ -21,13 +21,13 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             "http://www.w3.org/TR/REC-html40"
         };
 
-        public UrlService(HttpClient httpClient)
+        public UrlModuleService(HttpClient httpClient)
         {
             _httpClient = httpClient;
             _httpClient.Timeout = TimeSpan.FromSeconds(30);
         }
 
-        public async Task<DetectionResult> PerformLookup(ParsedEmail email)
+        public async Task<DetectionResult> AnalyzeEmailAsync(ParsedEmail email)
         {
             var detectionResult = new DetectionResult
             {

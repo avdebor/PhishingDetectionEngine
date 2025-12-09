@@ -7,8 +7,8 @@ using System.Threading.Tasks;
 
 namespace PhishingDetectionEngine.Core.Interfaces
 {
-    public interface IWhoIsService
+    public interface IModuleInterface
     {
-        Task<DetectionResult> AnalyzeDomainAsync(ParsedEmail eml);
+        Task<DetectionResult> AnalyzeEmailAsync(ParsedEmail eml);
     }
 }
