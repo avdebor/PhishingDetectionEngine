@@ -10,7 +10,7 @@ using Whois;
 
 namespace PhishingDetectionEngine.Core.ServiceModules
 {
-    public class WhoIsService : IWhoIsService
+    public class WhoIsService : IModuleInterface
     {
         private readonly WhoisLookup _whoisLookup;
 
@@ -19,7 +19,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             _whoisLookup = new WhoisLookup();
         }
 
-        public async Task<DetectionResult> AnalyzeDomainAsync(ParsedEmail eml)
+        public async Task<DetectionResult> AnalyzeEmailAsync(ParsedEmail eml)
         {
             if (eml == null)
             {

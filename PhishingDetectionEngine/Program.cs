@@ -23,7 +23,7 @@ builder.Services.Configure<FormOptions>(options =>
 builder.Services.AddControllers();
 builder.Services.AddScoped<PhishingOrchestrator>();
 builder.Services.AddScoped<EmailParserService>();
-builder.Services.AddScoped<IContentService, AnalyzeEmailContent>();
+builder.Services.AddScoped<IModuleInterface, AnalyzeEmailContent>();
 
 
 // Swagger / OpenAPI
@@ -42,8 +42,8 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 builder.Services.AddHttpClient();
-builder.Services.AddScoped<IUrlService, UrlService>();
-builder.Services.AddScoped<IWhoIsService, WhoIsService>();
+builder.Services.AddScoped<IModuleInterface, UrlService>();
+builder.Services.AddScoped<IModuleInterface, WhoIsService>();
 
 var app = builder.Build();
 

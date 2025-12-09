@@ -13,11 +13,11 @@ namespace PhishingDetectionEngine.Core
     public class PhishingOrchestrator
     {
         private readonly HttpClient _httpClient;
-        private readonly IWhoIsService _whoIsService;
-        private readonly IUrlService _urlService;
-        private readonly IContentService _contentService;
+        private readonly IModuleInterface _whoIsService;
+        private readonly IModuleInterface _urlService;
+        private readonly IModuleInterface _contentService;
 
-        public PhishingOrchestrator(HttpClient httpClient, IUrlService urlService, IWhoIsService whoIsService, IContentService      contentService)
+        public PhishingOrchestrator(HttpClient httpClient, IModuleInterface urlService, IModuleInterface whoIsService, IModuleInterface contentService)
         {
             _httpClient = httpClient;
             _urlService = urlService;
@@ -29,9 +29,9 @@ namespace PhishingDetectionEngine.Core
         {
             var detectionTasks = new List<Task<DetectionResult>>
             {
-                _urlService.PerformLookup(parsedEmail),
-                _whoIsService.AnalyzeDomainAsync(parsedEmail),
-                _contentService.AnalyzeContent(parsedEmail)
+                _urlService.AnalyzeEmailAsync(parsedEmail),
+                _whoIsService.AnalyzeEmailAsync(parsedEmail),
+                _contentService.AnalyzeEmailAsync(parsedEmail)
             };
 
             var detectionResults = await Task.WhenAll(detectionTasks);

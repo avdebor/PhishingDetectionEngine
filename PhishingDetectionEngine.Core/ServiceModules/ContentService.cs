@@ -8,7 +8,7 @@ using PhishingDetectionEngine.Core.Utilities;
 
 namespace PhishingDetectionEngine.Core.ServiceModules
 {
-    public class AnalyzeEmailContent : IContentService
+    public class AnalyzeEmailContent : IModuleInterface
     {
         private readonly HashSet<string> _suspiciousWordsDutch;
         private readonly HashSet<string> _suspiciousWordsEnglish;
@@ -86,7 +86,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             };
         }
 
-        public async Task<DetectionResult> AnalyzeContent(ParsedEmail email)
+        public async Task<DetectionResult> AnalyzeEmailAsync(ParsedEmail email)
         {
             var detectionResult = new DetectionResult
             {
