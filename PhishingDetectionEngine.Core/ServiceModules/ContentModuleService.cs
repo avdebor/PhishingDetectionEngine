@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Text.Json;
+using System.IO;
 using PhishingDetectionEngine.Core.Models;
 using PhishingDetectionEngine.Core.Interfaces;
 using PhishingDetectionEngine.Core.Utilities;
@@ -18,72 +20,52 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
         public ContentModuleService()
         {
-            // highly suspicious words
-            _highlySuspiciousWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "mobiele nummer", "WhatsApp-nummer", "WhatsApp", "mobile number", "telefoonnummer"
-            };
+            _highlySuspiciousWords = LoadWordListFromJson("Config/ContentModuleConfig/highlySuspiciousWords.json");
+            _suspiciousWordsDutch = LoadWordListFromJson("Config/ContentModuleConfig/suspiciousWordsDutch.json");
+            _suspiciousWordsEnglish = LoadWordListFromJson("Config/ContentModuleConfig/suspiciousWordsEnglish.json");
+            _urgentActionWords = LoadWordListFromJson("Config/ContentModuleConfig/urgentActionWords.json");
+            _securityTerms = LoadWordListFromJson("Config/ContentModuleConfig/securityTerms.json");
+        }
 
-            // Dutch suspicious words
-            _suspiciousWordsDutch = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        private HashSet<string> LoadWordListFromJson(string configPath)
+        {
+            try
             {
-                "bankgegevens", "inloggegevens",
-                "wachtwoord", "beveiligingscode", "verificatiecode", "sms code",
-                "authenticatie", "account", "betaalgegevens", "creditcard",
-                "pin code", "identiteitsbewijs", "bsn", "bsn nummer", "sofi nummer",
-                "herinnering", "dringend", "onmiddellijk", "dringende actie",
-                "bevestiging", "update", "onderhoud", "probleem",
-                "verdacht", "ongebruikelijk", "activiteit", "inbreuk",
-                "beveiliging", "veiligheid", "opschorten", "blokkeren",
-                "verlopen", "aankoop", "factuur",
-                "betaling", "transactie", "overschrijving", "limiet",
-                "premie", "korting", "aanbieding", "winnaar",
-                "prijs", "lottery", "geluksvogel", "gratis",
-                "urgent", "belangrijk", "aandacht", "waarschuwing"
-            };
+                // Try to get the file from the current directory (for development) or from the assembly location
+                string filePath = configPath;
+                
+                // If file doesn't exist in current directory, try to find it relative to the assembly
+                if (!File.Exists(filePath))
+                {
+                    var assemblyLocation = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                    var assemblyDirectory = Path.GetDirectoryName(assemblyLocation);
+                    if (!string.IsNullOrEmpty(assemblyDirectory))
+                    {
+                        filePath = Path.Combine(assemblyDirectory, configPath);
+                    }
+                }
 
-            // English suspicious words
-            _suspiciousWordsEnglish = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                if (File.Exists(filePath))
+                {
+                    var jsonContent = File.ReadAllText(filePath);
+                    var words = JsonSerializer.Deserialize<List<string>>(jsonContent);
+                    var wordCount = words?.Count ?? 0;
+                    Console.WriteLine($"Successfully loaded words from {configPath}");
+                    return new HashSet<string>(words ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+                }
+                else
+                {
+                    // Fallback: return empty HashSet if file not found and log the error
+                    Console.WriteLine("No configuration files found for Content module");
+                    return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                }
+            }
+            catch (Exception ex)
             {
-                "login", "verification", "password", "credentials",
-                "account", "security", "verify", "authentication",
-                "confirmation", "update", "maintenance", "problem",
-                "suspicious", "unusual", "activity", "breach",
-                "safety", "suspend", "block",
-                "expire", "expired", "purchase", "invoice",
-                "payment", "transaction", "transfer", "limit",
-                "premium", "discount", "offer", "winner",
-                "prize", "lottery", "lucky", "free",
-                "urgent", "important", "attention", "warning",
-                "immediately", "action required", "click here", "update now",
-                "confirm your", "validate your", "secure your", "protect your",
-                "banking", "financial", "personal information", "social security",
-                "credit card", "debit card", "paypal", "bitcoin",
-                "crypto", "password reset", "account recovery", "unlock account",
-                "activate", "accept", "awards", "award",
-                "start"
-            };
-
-            // Urgent action words 
-            _urgentActionWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "immediately", "urgent", "now", "right away",
-                "instant", "quick", "fast", "hurry",
-                "deadline", "limited time", "last chance", "final warning",
-                "action required", "immediate action", "respond now", "click immediately",
-                "dringend", "onmiddellijk", "nu handelen", "spoed"
-            };
-
-            // Security-related terms
-            _securityTerms = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "security", "verification", "authentication", "validation",
-                "confirm", "verify", "authenticate", "validate",
-                "password", "pin", "code", "token",
-                "2fa", "two factor", "multi factor", "biometric",
-                "encryption", "secure", "protected", "safety", "securing",
-                "wachtwoord", "inlog", "login"
-            };
+                // Fallback: return empty HashSet on error
+                Console.WriteLine($"Error loading configuration file {configPath}: {ex.Message}");
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
         }
 
         public async Task<DetectionResult> AnalyzeEmailAsync(ParsedEmail email)

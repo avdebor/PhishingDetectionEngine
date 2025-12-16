@@ -13,4 +13,12 @@
 		<PackageReference Include="Tokenizer" Version="2.2.2" />
 		<PackageReference Include="Whois" Version="3.0.1" />
 	</ItemGroup>
+
+	<ItemGroup>
+	<!-- register config files here -->
+
+		<Content Include="Config\ContentModuleConfig\*.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
 </Project>
