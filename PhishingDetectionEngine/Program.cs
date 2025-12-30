@@ -44,6 +44,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddScoped<IModuleInterface, UrlModuleService>();
 builder.Services.AddScoped<IModuleInterface, WhoIsModuleService>();
 builder.Services.AddScoped<IModuleInterface, ContentModuleService>();
+builder.Services.AddScoped<IModuleInterface, AttachmentModuleService>();
 
 var app = builder.Build();
 

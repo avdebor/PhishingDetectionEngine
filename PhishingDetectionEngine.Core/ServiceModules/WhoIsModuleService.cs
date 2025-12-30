@@ -107,8 +107,8 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 riskScore += AnalyzeContactInformation(whoisResponse, flags);
             }
 
-            // Calculate percentage (0% = safe, 100% = high risk)
-            var percentage = Math.Min(riskScore, maxRiskScore);
+            // Calculate percentage (0% = safe, 100% = high risk), clamp to avoid negative
+            var percentage = Math.Clamp(riskScore, 0, maxRiskScore);
 
             return new DetectionResult
             {
