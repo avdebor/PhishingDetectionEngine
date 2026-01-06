@@ -7,6 +7,11 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Configuration
+    .AddJsonFile("appsettings.json", optional: false)
+    .AddUserSecrets<Program>()
+    .AddEnvironmentVariables();
+
 // support legacy code pages (for some .msg parsing libraries)
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
@@ -41,6 +46,7 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 builder.Services.AddHttpClient();
+// Connecting the detection modules
 builder.Services.AddScoped<IModuleInterface, UrlModuleService>();
 builder.Services.AddScoped<IModuleInterface, WhoIsModuleService>();
 builder.Services.AddScoped<IModuleInterface, ContentModuleService>();
