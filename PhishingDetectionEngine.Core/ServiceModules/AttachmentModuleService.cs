@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using PhishingDetectionEngine.Core.Interfaces;
 using PhishingDetectionEngine.Core.Models;
 
@@ -14,16 +15,18 @@ namespace PhishingDetectionEngine.Core.ServiceModules
     {
         private readonly HttpClient _httpClient;
         private const string VirusTotalApiBaseUrl = "https://www.virustotal.com/api/v3";
-        private const string VirusTotalApiKey = ""; // TODO: provide VirusTotal API key
+        private readonly string _apiKey;
 
-        public AttachmentModuleService(HttpClient httpClient)
+        public AttachmentModuleService(HttpClient httpClient, IConfiguration configuration)
         {
             _httpClient = httpClient;
             _httpClient.Timeout = TimeSpan.FromSeconds(60);
+            _apiKey = configuration["ApiKeys:VirusTotal"] ?? string.Empty;
         }
 
         public async Task<DetectionResult> AnalyzeEmailAsync(ParsedEmail email)
         {
+            Console.WriteLine("VirusTotal API key:" + _apiKey);
             var detectionResult = new DetectionResult
             {
                 EmailSubject = email?.Subject ?? "No subject",
@@ -35,6 +38,12 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             if (email?.Attachments == null || !email.Attachments.Any())
             {
                 detectionResult.Flags.Add("No attachments to scan");
+                return detectionResult;
+            }
+
+            if (string.IsNullOrWhiteSpace(_apiKey))
+            {
+                detectionResult.Flags.Add("VirusTotal API key not configured");
                 return detectionResult;
             }
 
@@ -96,7 +105,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 string.IsNullOrWhiteSpace(attachment.FileName) ? "attachment.bin" : attachment.FileName);
 
             using var uploadRequest = new HttpRequestMessage(HttpMethod.Post, $"{VirusTotalApiBaseUrl}/files");
-            uploadRequest.Headers.Add("x-apikey", VirusTotalApiKey);
+            uploadRequest.Headers.Add("x-apikey", _apiKey);
             uploadRequest.Content = form;
 
             var uploadResponse = await _httpClient.SendAsync(uploadRequest);
@@ -113,7 +122,7 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             for (int attempt = 0; attempt < 15; attempt++)
             {
                 using var analysisRequest = new HttpRequestMessage(HttpMethod.Get, $"{VirusTotalApiBaseUrl}/analyses/{analysisId}");
-                analysisRequest.Headers.Add("x-apikey", VirusTotalApiKey);
+                analysisRequest.Headers.Add("x-apikey", _apiKey);
 
                 var analysisResponse = await _httpClient.SendAsync(analysisRequest);
                 analysisResponse.EnsureSuccessStatusCode();
