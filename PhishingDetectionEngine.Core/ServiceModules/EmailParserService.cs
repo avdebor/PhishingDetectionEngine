@@ -3,6 +3,9 @@ using MsgReader.Outlook;
 using PhishingDetectionEngine.Core.Interfaces;
 using PhishingDetectionEngine.Core.Models;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 
 
 namespace PhishingDetectionEngine.Core.ServiceModules
@@ -52,18 +55,21 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 var mp = (MimePart)part;
 
                 long size = 0;
+                byte[] contentBytes = Array.Empty<byte>();
                 if (mp.Content != null)
                 {
                     await using var ms = new MemoryStream();
                     await mp.Content.DecodeToAsync(ms);
-                    size = ms.Length;
+                    contentBytes = ms.ToArray();
+                    size = contentBytes.LongLength;
                 }
 
                 model.Attachments.Add(new EmailAttachment
                 {
                     FileName = mp.FileName ?? "attachment",
                     ContentType = mp.ContentType?.MimeType ?? "application/octet-stream",
-                    Size = size
+                    Size = size,
+                    Content = contentBytes
                 });
             }
 
@@ -102,7 +108,8 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             foreach (var att in attachments)
             {
                 var fileName = att.FileName ?? "attachment";
-                var size = att.Data?.LongLength ?? 0;
+                var data = att.Data;
+                var size = data?.LongLength ?? 0;
 
                 string contentType;
                 try
@@ -118,7 +125,8 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 {
                     FileName = fileName,
                     ContentType = contentType,
-                    Size = (long)size
+                    Size = (long)size,
+                    Content = data ?? Array.Empty<byte>()
                 });
             }
 

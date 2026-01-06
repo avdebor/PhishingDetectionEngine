@@ -53,7 +53,10 @@ namespace PhishingDetectionEngine.Core
 
             double product = 1;
             foreach (var s in scores)
-                product *= (1 - s / 100.0);
+            {
+                var clamped = Math.Clamp(s, 0, 100);
+                product *= (1 - clamped / 100.0);
+            }
 
             int result = (int)Math.Round((1 - product) * 100);
             return result;
