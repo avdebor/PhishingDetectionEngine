@@ -18,7 +18,8 @@ namespace PhishingDetectionEngine.Core.ServiceModules
         private static readonly HashSet<string> KnownSafeMsgUrls = new()
         {
             "http://schemas.microsoft.com/office/2004/12/omml",
-            "http://www.w3.org/TR/REC-html40"
+            "http://www.w3.org/TR/REC-html40",
+            "https://aka.ms/LearnAboutSenderIdentification"
         };
 
         public UrlModuleService(HttpClient httpClient)
