@@ -1,3 +1,5 @@
+*** There is a second branch called `optimized-formula-for-automation`, containing the new formula that is less paranoid and is better for automation (fewer false positives) ***
+
 # Phishing Detection Engine
 
 This repo contains two projects:
