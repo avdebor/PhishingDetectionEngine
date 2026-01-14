@@ -1,3 +1,5 @@
+> This is the version of the software with the second version of the formula that suits automation
+
 # Phishing Detection Engine
 
 This repo contains two projects:
