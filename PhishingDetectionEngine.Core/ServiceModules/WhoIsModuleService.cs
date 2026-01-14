@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Whois;
 
@@ -12,10 +13,68 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 {
     public class WhoIsModuleService : IModuleInterface
     {
+        private readonly HashSet<string> _commonPrefixes;
+        private readonly HashSet<string> _commonMultiPartCountryCodes;
+        private readonly HashSet<string> _commonTlds;
+        private readonly HashSet<string> _highRiskNsProviders;
+        private readonly HashSet<string> _legitimateNsProviders;
+        private readonly HashSet<string> _genericEmailPatterns;
+        private readonly HashSet<string> _whoIsPrivacyIndicators;
+        private readonly HashSet<string> _highRiskSubdomainPatterns;
+        private readonly HashSet<string> _legitimateDomains;
 
-        public WhoIsModuleService(){}
+        public WhoIsModuleService()
+        {
+            _commonPrefixes = LoadWordListFromJson("Config/WhoIsModuleConfig/CommonPrefixes.json");
+            _commonMultiPartCountryCodes = LoadWordListFromJson("Config/WhoIsModuleConfig/CommonMultiPartCountryCodes.json");
+            _commonTlds = LoadWordListFromJson("Config/WhoIsModuleConfig/CommonTlds.json");
+            _highRiskNsProviders = LoadWordListFromJson("Config/WhoIsModuleConfig/HighRiskNameServerProviders.json");
+            _legitimateNsProviders = LoadWordListFromJson("Config/WhoIsModuleConfig/LegitimateNameServerProviders.json");
+            _genericEmailPatterns = LoadWordListFromJson("Config/WhoIsModuleConfig/GenericEmailPatterns.json");
+            _whoIsPrivacyIndicators = LoadWordListFromJson("Config/WhoIsModuleConfig/WhoIsPrivacyIndicators.json");
+            _highRiskSubdomainPatterns = LoadWordListFromJson("Config/WhoIsModuleConfig/HighRiskSubDomainPatterns.json");
+            _legitimateDomains = LoadWordListFromJson("Config/WhoIsModuleConfig/LegitimateDomains.json");
+        }
+        private HashSet<string> LoadWordListFromJson(string configPath)
+        {
+            try
+            {
+                // Try to get the file from the current directory (for development) or from the assembly location
+                string filePath = configPath;
 
+                // If file doesn't exist in current directory, try to find it relative to the assembly
+                if (!File.Exists(filePath))
+                {
+                    var assemblyLocation = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                    var assemblyDirectory = Path.GetDirectoryName(assemblyLocation);
+                    if (!string.IsNullOrEmpty(assemblyDirectory))
+                    {
+                        filePath = Path.Combine(assemblyDirectory, configPath);
+                    }
+                }
 
+                if (File.Exists(filePath))
+                {
+                    var jsonContent = File.ReadAllText(filePath);
+                    var words = JsonSerializer.Deserialize<List<string>>(jsonContent);
+                    var wordCount = words?.Count ?? 0;
+                    Console.WriteLine($"Successfully loaded words from {configPath}");
+                    return new HashSet<string>(words ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+                }
+                else
+                {
+                    // Fallback: return empty HashSet if file not found and log the error
+                    Console.WriteLine("No configuration files found for WhoIs module");
+                    return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Fallback: return empty HashSet on error
+                Console.WriteLine($"Error loading configuration file {configPath}: {ex.Message}");
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
+        }
         public async Task<DetectionResult> AnalyzeEmailAsync(ParsedEmail eml)
         {
             if (eml == null)
@@ -33,6 +92,17 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                     EmailSubject = eml.Subject,
                     Percentage = 0,
                     Flags = ["No valid domain found!"],
+                    DateOfScan = DateTime.Now
+                };
+            }
+            // Check if the domain is in the legitimate domains list
+            if (_legitimateDomains.Contains(domain))
+            {
+                return new DetectionResult
+                {
+                    EmailSubject = eml.Subject,
+                    Percentage = 0, // No risk for legitimate domains
+                    Flags = [$"Domain '{domain}' is in the list of legitimate domains."],
                     DateOfScan = DateTime.Now
                 };
             }
@@ -60,9 +130,6 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             using var whoisLookup = new WhoisLookup();
             return await whoisLookup.LookupAsync(domain);
         }
-
-
-
         private async Task<DetectionResult> AnalyzeWhoIsResponse(WhoisResponse whoisResponse, string domain, string subject)
         {
             var flags = new List<string>();
@@ -118,7 +185,6 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 DateOfScan = DateTime.Now
             };
         }
-
         private async Task<int> HandlePossibleSubdomain(string domain, List<string> flags)
         {
             var riskScore = 0;
@@ -173,12 +239,18 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
             return riskScore;
         }
-
         private async Task<int> AnalyzeSubdomainRisk(string subdomain, string rootDomain, List<string> flags)
         {
             var riskScore = 0;
 
-            // Check if subdomain actually resolves in DNS
+            // Check if the root domain is legitimate
+            if (_legitimateDomains.Contains(rootDomain))
+            {
+                flags.Add($"Subdomain '{subdomain}' belongs to legitimate root domain '{rootDomain}'.");
+                return riskScore; // Skip further checks for legitimate subdomains
+            }
+
+            // Check if subdomain resolves in DNS
             var subdomainResolves = await ValidateDomainExists(subdomain);
 
             if (!subdomainResolves)
@@ -229,7 +301,6 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 return false; // Other errors
             }
         }
-
         private async Task<(bool IsDifferent, string SubdomainIP, string RootDomainIP)> CompareIPAddresses(string subdomain, string rootDomain)
         {
             try
@@ -250,18 +321,13 @@ namespace PhishingDetectionEngine.Core.ServiceModules
                 return (true, "Unknown", "Unknown"); // Assume different if we can't check
             }
         }
-
         private int AnalyzeSubdomainPatterns(string fullDomain, string rootDomain, List<string> flags)
         {
             var riskScore = 0;
             var subdomainPart = fullDomain.Replace($".{rootDomain}", "").ToLower();
 
             // Check for suspicious subdomain names
-            var highRiskPatterns = new[]
-            {
-                "login", "security", "verify", "account", "update",
-                "secure", "auth", "signin", "password", "confirm"
-            };
+            var highRiskPatterns = _highRiskSubdomainPatterns;
 
             if (highRiskPatterns.Any(pattern => subdomainPart.Contains(pattern)))
             {
@@ -271,7 +337,6 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
             return riskScore;
         }
-
         private string GetRootDomain(string domain)
         {
             var parts = domain.Split('.');
@@ -291,7 +356,6 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
             return domain;
         }
-
         private bool IsLikelyMultiPartTld(string potentialTld)
         {
             var parts = potentialTld.Split('.');
@@ -300,13 +364,11 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             var firstPart = parts[0];
             var secondPart = parts[1];
 
-            var commonPrefixes = new[] { "co", "com", "net", "org", "ac", "edu", "gov" };
-            var countryCodes = new[] { "uk", "au", "nz", "jp", "br", "in", "sg" };
+            var commonPrefixes = _commonPrefixes;
+            var countryCodes = _commonMultiPartCountryCodes;
 
             return commonPrefixes.Contains(firstPart) && countryCodes.Contains(secondPart);
         }
-
-        // Check if domain is very new (common in phishing)
         private int AnalyzeDomainAge(WhoisResponse whoisResponse, List<string> flags)
         {
             var riskScore = 0;
@@ -337,8 +399,6 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
             return riskScore;
         }
-
-        // Check if registrar is commonly used for phishing
         private int AnalyzeRegistrar(WhoisResponse whoisResponse, List<string> flags)
         {
             var riskScore = 0;
@@ -367,7 +427,6 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
             return riskScore;
         }
-
         private int CalculateRegistrarRisk(string registrar)
         {
             int score = 0;
@@ -383,8 +442,6 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
             return score;
         }
-
-        // Check if WHOIS privacy is enabled (hides owner identity)
         private int AnalyzeWhoisPrivacy(WhoisResponse whoisResponse, List<string> flags)
         {
             var riskScore = 0;
@@ -397,8 +454,6 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
             return riskScore;
         }
-
-        // Check domain status (suspended, pending delete, etc.)
         private int AnalyzeDomainStatus(WhoisResponse whoisResponse, List<string> flags)
         {
             var riskScore = 0;
@@ -432,8 +487,6 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
             return riskScore;
         }
-
-        // Check if TLD is risky (new, uncommon, numeric)
         private int AnalyzeTLD(string domain, List<string> flags)
         {
             var riskScore = 0;
@@ -455,7 +508,6 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             }
             return riskScore;
         }
-
         private int CalculateTldRisk(string tld)
         {
             int score = 0;
@@ -471,14 +523,11 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
             return score;
         }
-
         private bool IsCommonTld(string tld)
         {
-            var commonTlds = new[] { "com", "org", "net", "edu", "gov", "mil", "int" };
+            var commonTlds = _commonTlds;
             return commonTlds.Contains(tld) || tld.Length <= 3;
         }
-
-        // Check for fake brand domains
         private int AnalyzeBrandImpersonation(string domain, List<string> flags)
         {
             var riskScore = 0;
@@ -493,8 +542,6 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
             return riskScore;
         }
-
-        // Check if name servers are suspicious
         private int AnalyzeNameServers(WhoisResponse whoisResponse, List<string> flags)
         {
             var riskScore = 0;
@@ -537,7 +584,6 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             riskScore += 10;
             return riskScore;
         }
-
         // Helper method to extract nameservers from raw WHOIS content
         private List<string> ExtractNameserversFromContent(string content)
         {
@@ -613,26 +659,16 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
             return nameservers.Distinct().ToList();
         }
-
         private int CalculateNameServerRisk(IEnumerable<string> nameServers)
         {
             int score = 0;
             var nsList = nameServers.ToList();
 
             // High-risk hosting providers commonly used for phishing
-            var highRiskProviders = new[]
-            {
-                "freedns", "cheap", "bulletproof", "anonymous",
-                "privacy", "bitcoin", "crypto", "tor"
-            };
+            var highRiskProviders = _highRiskNsProviders;
 
-                    // Known legitimate providers (negative scoring)
-            var legitimateProviders = new[]
-            {
-                "cloudflare", "akamai", "amazonaws", "awsdns",
-                "google", "googledomains", "microsoft",
-                "rackspace", "godaddy", "namecheap"
-            };
+            // Known legitimate providers (negative scoring)
+            var legitimateProviders = _legitimateNsProviders;
 
             foreach (var ns in nsList)
             {
@@ -694,8 +730,6 @@ namespace PhishingDetectionEngine.Core.ServiceModules
             // Cap the score
             return Math.Max(0, Math.Min(score, 20));
         }
-
-        // Check if contact information is hidden or generic
         private int AnalyzeContactInformation(WhoisResponse whoisResponse, List<string> flags)
         {
             var riskScore = 0;
@@ -717,19 +751,16 @@ namespace PhishingDetectionEngine.Core.ServiceModules
 
             return riskScore;
         }
-
         private bool IsGenericContactEmail(string email)
         {
             if (string.IsNullOrEmpty(email)) return false;
 
-            var genericPatterns = new[] { "@", "contact", "info", "admin", "privacy", "whois" };
+            var genericPatterns = _genericEmailPatterns;
             return genericPatterns.Count(pattern => email.Contains(pattern)) >= 2;
         }
-
-        // Check if WHOIS privacy is enabled
         private bool IsWhoisPrivacyEnabled(WhoisResponse whoisResponse)
         {
-            var privacyIndicators = new[] { "privacy", "redacted", "whois", "protected", "anonymized", "whoisguard", "identity protect" };
+            var privacyIndicators = _whoIsPrivacyIndicators;
 
             var registrantName = whoisResponse.Registrant?.Name?.ToLower() ?? "";
             var registrantOrganization = whoisResponse.Registrant?.Organization?.ToLower() ?? "";
