@@ -51,14 +51,20 @@ namespace PhishingDetectionEngine.Core
             if (scores == null || scores.Count == 0)
                 return 0;
 
-            double product = 1;
+            double product = 1.0;
             foreach (var s in scores)
             {
                 var clamped = Math.Clamp(s, 0, 100);
                 product *= (1 - clamped / 100.0);
             }
 
-            int result = (int)Math.Round((1 - product) * 100);
+            double rawScore = 1 - product;
+
+            double alpha = 1 + rawScore;
+
+            double finalScore = Math.Pow(rawScore, alpha);
+
+            int result = (int)Math.Ceiling(finalScore * 100);
             return result;
         }
     }
